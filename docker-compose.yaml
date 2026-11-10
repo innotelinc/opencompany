@@ -1,0 +1,74 @@
+# OpenCompany on Coolify.
+#
+# Deploy this file as a Coolify "Docker Compose" resource. Build context is the
+# repository root, so Coolify needs a Git source it can clone. Web and worker
+# share one image and one SQLite volume; run exactly one replica of each.
+#
+# Secrets belong in Coolify's environment UI, never in this file or the repo.
+
+x-opencompany-environment: &opencompany-environment
+  NODE_ENV: production
+  OPENCOMPANY_DATA_DIR: /app/.data
+  OPENCOMPANY_DB: /app/.data/opencompany.db
+  OPENCOMPANY_OWNER_EMAIL: ${OPENCOMPANY_OWNER_EMAIL:-owner@northwind-studio.test}
+  OPENCOMPANY_COMPANY_SLUG: ${OPENCOMPANY_COMPANY_SLUG:-northwind-studio}
+  OPENCOMPANY_AGENT_BACKEND: ${OPENCOMPANY_AGENT_BACKEND:-deterministic}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+  OPENCOMPANY_MODEL: ${OPENCOMPANY_MODEL:-gpt-4.1-mini}
+  OPENCOMPANY_MODEL_FALLBACKS: ${OPENCOMPANY_MODEL_FALLBACKS:-}
+  OPENCOMPANY_MONTHLY_BUDGET_CENTS: ${OPENCOMPANY_MONTHLY_BUDGET_CENTS:-2500}
+  OPENCOMPANY_AUTO_APPROVE_CENTS: ${OPENCOMPANY_AUTO_APPROVE_CENTS:-300}
+  OPENCOMPANY_MAX_DELEGATION_DEPTH: ${OPENCOMPANY_MAX_DELEGATION_DEPTH:-3}
+  OPENCOMPANY_MAX_REVIEW_ROUNDS: ${OPENCOMPANY_MAX_REVIEW_ROUNDS:-2}
+  OPENCOMPANY_MAX_ATTEMPTS: ${OPENCOMPANY_MAX_ATTEMPTS:-2}
+  OPENCOMPANY_RUN_TIMEOUT_SECONDS: ${OPENCOMPANY_RUN_TIMEOUT_SECONDS:-600}
+  OPENCOMPANY_RUN_LEASE_SECONDS: ${OPENCOMPANY_RUN_LEASE_SECONDS:-120}
+  OPENCOMPANY_WORKER_POLL_MS: ${OPENCOMPANY_WORKER_POLL_MS:-1500}
+  OPENCOMPANY_BROWSER_ENABLED: ${OPENCOMPANY_BROWSER_ENABLED:-0}
+  OPENCOMPANY_DEPLOY_PROVIDER: ${OPENCOMPANY_DEPLOY_PROVIDER:-vercel}
+  VERCEL_TOKEN: ${VERCEL_TOKEN:-}
+  VERCEL_PROJECT_ID: ${VERCEL_PROJECT_ID:-}
+  VERCEL_TEAM_ID: ${VERCEL_TEAM_ID:-}
+  OPENCOMPANY_DEPLOY_NAME: ${OPENCOMPANY_DEPLOY_NAME:-opencompany-site}
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "npm run db:migrate && npm run db:seed && npm start"
+    environment: *opencompany-environment
+    ports:
+      - "3001:3000"
+    volumes:
+      - opencompany-data:/app/.data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "npm run db:migrate && npm run worker"
+    environment: *opencompany-environment
+    volumes:
+      - opencompany-data:/app/.data
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  opencompany-data:
