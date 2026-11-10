@@ -8,6 +8,7 @@ import {
   listDeliverableVersions,
 } from "@/lib/domain/repo";
 import { resolveArtifactFile } from "@/lib/engine/artifacts";
+import { rewritePublicUrls } from "@/lib/public-site/rewrite-urls";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,8 +88,11 @@ export async function GET(
   const target = resolveArtifactFile(version.artifactPath, relative);
   if (!target) return new Response("Not found", { status: 404 });
 
-  const body = fs.readFileSync(target);
   const ext = path.extname(target).toLowerCase();
+  const body =
+    ext === ".html"
+      ? rewritePublicUrls(fs.readFileSync(target, "utf8"), relative)
+      : fs.readFileSync(target);
   return new Response(body, {
     headers: {
       "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream",
