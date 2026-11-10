@@ -1,0 +1,45 @@
+{
+  "name": "opencompany",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "OpenCompany — an open-source AI company operating system where AI employees run authorized work and the human owner holds authority.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "dev:worker": "tsx watch src/worker/main.ts",
+    "dev:all": "node scripts/dev-all.mjs",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "worker": "tsx src/worker/main.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:reset": "tsx scripts/reset.ts",
+    "demo": "tsx scripts/demo.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "verify": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@copilotkit/react-core": "1.85.0",
+    "@copilotkit/react-ui": "1.85.0",
+    "@copilotkit/runtime": "1.85.0",
+    "better-sqlite3": "13.0.3",
+    "next": "15.5.29",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "24.10.1",
+    "@types/react": "19.1.17",
+    "@types/react-dom": "19.1.11",
+    "concurrently": "9.2.1",
+    "playwright": "^1.65.0",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  }
+}

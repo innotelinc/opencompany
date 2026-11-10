@@ -1,0 +1,10 @@
+node_modules
+.next
+.data
+.upstream
+.env
+.env.*
+!.env.example
+*.log
+.git
+screenshots

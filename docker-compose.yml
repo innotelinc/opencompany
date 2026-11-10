@@ -1,0 +1,31 @@
+services:
+  web:
+    build: .
+    command: sh -c "npm run db:migrate && npm run db:seed && npm start"
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      OPENCOMPANY_DATA_DIR: /app/.data
+      OPENCOMPANY_DB: /app/.data/opencompany.db
+    volumes:
+      - opencompany-data:/app/.data
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: sh -c "npm run db:migrate && npm run db:seed && npm run worker"
+    env_file:
+      - .env
+    environment:
+      OPENCOMPANY_DATA_DIR: /app/.data
+      OPENCOMPANY_DB: /app/.data/opencompany.db
+    volumes:
+      - opencompany-data:/app/.data
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  opencompany-data:

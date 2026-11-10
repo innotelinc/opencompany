@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenCompany durable worker
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/opencompany
+EnvironmentFile=/opt/opencompany/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run worker
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
