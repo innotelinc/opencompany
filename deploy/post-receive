@@ -18,4 +18,5 @@ while read -r _old new ref; do
   fi
 done
 
-exec /opt/opencompany/scripts/deploy.sh main
+# Run through the interpreter so the hook never depends on the checkout's mode bits.
+exec /bin/bash /opt/opencompany/scripts/deploy.sh main
