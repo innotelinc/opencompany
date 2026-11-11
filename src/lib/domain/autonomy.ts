@@ -19,6 +19,57 @@ export type StandingApprovalKind = (typeof STANDING_APPROVAL_KINDS)[number];
 /** Categories the owner may not delegate to a standing approval. */
 const NEVER_STANDING: string[] = ["credential_use", "data_export"];
 
+/** Lower-case and unify separators so "Public Deploy" and "public-deploy" agree. */
+function normalizeKind(kind: string): string {
+  return kind.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+/**
+ * Employees word the same category differently depending on the model: one
+ * proposes "publish", the next "public_deploy", a third "plan_approval". The
+ * owner granted a category, not a spelling, so every wording a live agent has
+ * produced maps onto the catalogue before coverage is judged. The decision
+ * keeps the wording the employee used, for the audit trail.
+ */
+const KIND_ALIASES: Record<string, StandingApprovalKind> = {
+  plan: "plan",
+  plan_approval: "plan",
+  approve_plan: "plan",
+  project_plan: "plan",
+  budget: "plan",
+  budget_approval: "plan",
+  public_deploy: "public_deploy",
+  deploy: "public_deploy",
+  deployment: "public_deploy",
+  publish: "public_deploy",
+  publishing: "public_deploy",
+  publish_site: "public_deploy",
+  site_publish: "public_deploy",
+  spend: "spend",
+  spending: "spend",
+  purchase: "spend",
+  payment: "spend",
+  external_communication: "external_communication",
+  external_message: "external_communication",
+  external_email: "external_communication",
+  email: "external_communication",
+  outreach: "external_communication",
+};
+
+/** Which catalogue kind a decision belongs to, or null when it is not delegable. */
+export function canonicalDecisionKind(kind: string): StandingApprovalKind | null {
+  const key = normalizeKind(kind);
+  const direct = KIND_ALIASES[key];
+  if (direct) return direct;
+  if (key.startsWith("plan") || key.includes("budget")) return "plan";
+  if (key.includes("deploy") || key.includes("publish")) return "public_deploy";
+  if (key.includes("spend") || key.includes("purchase") || key.includes("payment")) return "spend";
+  if (key.startsWith("external") || key.includes("message") || key.includes("email")) {
+    return "external_communication";
+  }
+  return null;
+}
+
 export const STANDING_APPROVAL_POLICY = "autonomy.standing_approval";
 
 export interface StandingApproval {
@@ -146,15 +197,24 @@ export function matchesStandingApproval(input: {
   if (company?.haltedAt) {
     return { allowed: false, reason: "The emergency stop is active; nothing is decided automatically.", approval };
   }
-  if (NEVER_STANDING.includes(input.kind)) {
-    return { allowed: false, reason: `${input.kind.replace(/_/g, " ")} can never be granted in advance.`, approval };
+  const normalized = normalizeKind(input.kind);
+  if (NEVER_STANDING.includes(normalized)) {
+    return { allowed: false, reason: `${normalized.replace(/_/g, " ")} can never be granted in advance.`, approval };
   }
-  if (!approval.kinds.includes(input.kind as StandingApprovalKind)) {
-    return { allowed: false, reason: `${input.kind.replace(/_/g, " ")} is outside the standing approval.`, approval };
+  const canonical = canonicalDecisionKind(input.kind);
+  if (!canonical) {
+    return {
+      allowed: false,
+      reason: `${normalized.replace(/_/g, " ")} is not a kind the standing approval can cover.`,
+      approval,
+    };
+  }
+  if (!approval.kinds.includes(canonical)) {
+    return { allowed: false, reason: `${normalized.replace(/_/g, " ")} is outside the standing approval.`, approval };
   }
   return {
     allowed: true,
-    reason: `Inside the owner's unlimited standing approval for ${input.kind.replace(/_/g, " ")}.`,
+    reason: `Inside the owner's unlimited standing approval for ${canonical.replace(/_/g, " ")}.`,
     approval,
   };
 }

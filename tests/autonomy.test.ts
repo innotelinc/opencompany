@@ -70,6 +70,46 @@ test("the grant has no ceiling: every amount of a granted kind is approved", () 
   assert.equal(deploy.status, "pending", "kinds the owner did not grant still wait");
 });
 
+test("agent wordings for a granted kind still match the standing approval", () => {
+  grantStandingApproval({ companyId, ownerId: owner.id, kinds: ["plan", "public_deploy"] });
+
+  const publish = proposeDecision({
+    companyId,
+    requestedByEmployeeId: null,
+    taskId: null,
+    projectId: null,
+    kind: "publish",
+    title: "Publish the site",
+    businessReason: "Ship the reviewed site.",
+    action: { target: "example.test" },
+  });
+  assert.equal(publish.status, "auto_approved", "an agent that says publish means public_deploy");
+
+  const planAlias = proposeDecision({
+    companyId,
+    requestedByEmployeeId: null,
+    taskId: null,
+    projectId: null,
+    kind: "plan_approval",
+    title: "Approve the plan",
+    businessReason: "Release the plan.",
+    action: { taskIds: [] },
+  });
+  assert.equal(planAlias.status, "auto_approved", "plan_approval is the plan kind");
+
+  const credential = proposeDecision({
+    companyId,
+    requestedByEmployeeId: null,
+    taskId: null,
+    projectId: null,
+    kind: "credential_use",
+    title: "Use the client's credentials",
+    businessReason: "Sign in as the client.",
+    action: { provider: "client" },
+  });
+  assert.equal(credential.status, "pending", "credential use never rides on a standing approval");
+});
+
 test("revoking the grant restores manual approval", () => {
   revokeStandingApproval({ companyId, ownerId: owner.id });
   assert.equal(getStandingApproval(companyId).granted, false);
