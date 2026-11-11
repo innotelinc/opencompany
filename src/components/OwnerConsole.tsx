@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { StandingApproval } from "@/lib/domain/autonomy";
 
 async function post(url: string, body: unknown): Promise<{ ok: boolean; error?: string }> {
   const response = await fetch(url, {
@@ -208,6 +209,134 @@ export function DecisionActions({
         </button>
       </div>
       {error ? <p className="tiny" style={{ color: "var(--danger)", margin: 0 }}>{error}</p> : null}
+    </div>
+  );
+}
+
+const STANDING_KIND_LABELS: { value: string; label: string; hint: string }[] = [
+  { value: "plan", label: "Plans and budgets", hint: "Release CEO plans that fit the cap without a manual approval." },
+  { value: "spend", label: "Spend inside the cap", hint: "Cover purchases at or below the cap." },
+  { value: "external_communication", label: "External messages", hint: "Send prepared messages to prepared recipients." },
+  { value: "public_deploy", label: "Public deployment", hint: "Publish a reviewed artifact. Hard to recall once it starts." },
+];
+
+/**
+ * The owner grants a bounded, revocable standing approval once and the company
+ * keeps applying it. It is stored as company policy, so it survives restarts
+ * and is visible in Administration next to every other limit.
+ */
+export function StandingApprovalForm({ approval }: { approval: StandingApproval }) {
+  const router = useRouter();
+  const [kinds, setKinds] = useState<string[]>(approval.kinds);
+  const [maxCents, setMaxCents] = useState(approval.maxCents || 300);
+  const [note, setNote] = useState(approval.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  function toggle(value: string) {
+    setKinds((current) =>
+      current.includes(value) ? current.filter((kind) => kind !== value) : [...current, value],
+    );
+  }
+
+  async function send(action: "grant" | "revoke") {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    const result = await post("/api/autonomy", { action, kinds, maxCents, note });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error ?? "Could not save the standing approval.");
+      return;
+    }
+    setMessage(
+      action === "grant"
+        ? "Standing approval remembered. Matching decisions are approved automatically from now on."
+        : "Standing approval revoked. Every decision waits for you again.",
+    );
+    router.refresh();
+  }
+
+  return (
+    <div className="stack" style={{ gap: 12 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <span className={`badge ${approval.granted ? "ok" : "warn"}`}>
+          {approval.granted ? "standing approval active" : "waiting for you"}
+        </span>
+        {approval.granted ? (
+          <span className="tiny faint">
+            granted by the owner {approval.grantedAt ? new Date(approval.grantedAt).toLocaleString() : "earlier"} · cap{" "}
+            {approval.maxCents}¢{approval.note ? ` · “${approval.note}”` : ""}
+          </span>
+        ) : (
+          <span className="tiny faint">Nothing is approved automatically until you grant it here.</span>
+        )}
+      </div>
+
+      <div className="grid" style={{ gap: 6 }}>
+        {STANDING_KIND_LABELS.map((option) => (
+          <label
+            key={option.value}
+            htmlFor={`standing-${option.value}`}
+            className="row"
+            style={{ gap: 8, alignItems: "flex-start", textTransform: "none", letterSpacing: 0, margin: 0 }}
+          >
+            <input
+              id={`standing-${option.value}`}
+              type="checkbox"
+              checked={kinds.includes(option.value)}
+              onChange={() => toggle(option.value)}
+              style={{ width: 15, height: 15, marginTop: 3, accentColor: "var(--brass)" }}
+            />
+            <span>
+              <span style={{ color: "var(--ink)", fontSize: 12.5 }}>{option.label}</span>
+              <br />
+              <span className="tiny faint">{option.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div className="field-row">
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor="standing-max">Ceiling per decision (cents)</label>
+          <input
+            id="standing-max"
+            type="number"
+            min={0}
+            value={maxCents}
+            onChange={(event) => setMaxCents(Number(event.target.value))}
+          />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor="standing-note">Why (kept in the audit trail)</label>
+          <input
+            id="standing-note"
+            value={note}
+            placeholder="e.g. ship routine site updates without me"
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="row">
+        <button className="btn primary" type="button" disabled={busy} onClick={() => send("grant")}>
+          {busy ? "Saving…" : approval.granted ? "Update standing approval" : "Grant standing approval"}
+        </button>
+        {approval.granted ? (
+          <button className="btn danger" type="button" disabled={busy} onClick={() => send("revoke")}>
+            Revoke
+          </button>
+        ) : null}
+      </div>
+
+      <p className="tiny faint" style={{ margin: 0 }}>
+        Credential use, data export and high-risk actions always come to you, whatever is granted here. The emergency
+        stop overrides everything.
+      </p>
+      {message ? <p className="small" style={{ margin: 0 }}>{message}</p> : null}
+      {error ? <p className="tiny" style={{ margin: 0, color: "var(--danger)" }}>{error}</p> : null}
     </div>
   );
 }

@@ -38,6 +38,7 @@ import {
   setComputerStatus,
   setDeliverableStatus,
   setEmployeeStatus,
+  setPolicy,
   updateGoalStatus,
   updateRoutineAfterRun,
   updateTask,
@@ -215,6 +216,10 @@ export async function dispatchNextTask(
   const company = getCompany(companyId);
   if (!company || company.haltedAt) return false;
   const policies = getPolicies(companyId);
+  // The provider told us to wait (cooldown, gateway outage). Hold dispatch until
+  // then instead of re-burning the same attempts inside the cooldown window.
+  const cooldownUntil = Date.parse(String(policies["provider.cooldown_until"] ?? ""));
+  if (Number.isFinite(cooldownUntil) && cooldownUntil > Date.now()) return false;
 
   for (const task of listReadyTasks(companyId)) {
     if (!task.assigneeId) {
@@ -678,21 +683,30 @@ function handleRunFailure(input: {
 
   if (input.error instanceof ProviderUnavailableError) {
     finishRun(companyId, run.id, "failed", { error: message });
-    // A gateway outage is infrastructure, not a failed deliverable: retry inside
-    // the same attempt budget instead of stranding the plan on one 502.
+    // A gateway outage or rate limit is infrastructure, not a failed employee.
+    // Wait out the provider's own cooldown (bounded), then retry inside the same
+    // attempt budget instead of burning every attempt within two seconds.
+    const cooldownMs = Math.min(Math.max(input.error.retryAfterMs || 30_000, 5_000), 10 * 60_000);
+    setPolicy(
+      companyId,
+      "provider.cooldown_until",
+      new Date(Date.now() + cooldownMs).toISOString(),
+      "Dispatch pauses until this time after the model provider reported a cooldown or outage.",
+    );
     const attemptsLeft = task.attemptCount < task.maxAttempts;
     updateTask(companyId, task.id, {
       status: attemptsLeft ? "pending" : "blocked",
       blockedReason: attemptsLeft ? null : `Provider unavailable: ${message}`,
     });
-    setEmployeeStatus(companyId, employee.id, attemptsLeft ? "idle" : "error");
+    // The employee is not broken — the task carries the blocked state.
+    setEmployeeStatus(companyId, employee.id, "idle");
     recordActivity({
       companyId,
       actorType: "system",
       type: attemptsLeft ? "provider.retry" : "provider.unavailable",
       summary: attemptsLeft
-        ? `"${task.title}" will retry after a provider error: ${message}`
-        : `Blocked "${task.title}": ${message}`,
+        ? `"${task.title}" will retry in ${Math.round(cooldownMs / 1000)}s after a provider error: ${message}`
+        : `Blocked "${task.title}" after the provider stayed unavailable: ${message}`,
       taskId: task.id,
     });
     if (!attemptsLeft) result.blocked.push(task.id);
@@ -705,7 +719,9 @@ function handleRunFailure(input: {
     status: attemptsLeft ? "pending" : "blocked",
     blockedReason: attemptsLeft ? null : `Failed after ${task.attemptCount} attempt(s): ${message}`,
   });
-  setEmployeeStatus(companyId, employee.id, attemptsLeft ? "idle" : "error");
+  // A task that ran out of retries is blocked; the employee simply has nothing
+  // running. Leaving them in "error" made a transient failure look permanent.
+  setEmployeeStatus(companyId, employee.id, "idle");
   recordActivity({
     companyId,
     actorType: "system",
@@ -830,13 +846,18 @@ function handlePlan(input: {
     risk: plan.budgetCents > 100 ? "medium" : "low",
   });
 
-  if (autoApprove) {
-    // Auto-approval is a recorded policy outcome, not a human decision.
-    updateDecision(companyId, decision.id, {
-      status: "auto_approved",
-      decidedBy: "policy:auto-approve",
-      resolutionNote: "Inside the configured plan and budget policy.",
-    });
+  // The owner's standing approval may already have resolved this decision when
+  // it was proposed, in which case the plan is released the same way.
+  const approvedInAdvance = decision.status === "auto_approved" || decision.status === "approved";
+  if (autoApprove || approvedInAdvance) {
+    if (!approvedInAdvance) {
+      // Auto-approval by policy is a recorded policy outcome, not a human decision.
+      updateDecision(companyId, decision.id, {
+        status: "auto_approved",
+        decidedBy: "policy:auto-approve",
+        resolutionNote: "Inside the configured plan and budget policy.",
+      });
+    }
     for (const createdTask of created) {
       updateTask(companyId, createdTask.id, { status: "pending", blockedReason: null });
     }
@@ -846,7 +867,9 @@ function handlePlan(input: {
       companyId,
       actorType: "system",
       type: "plan.auto_approved",
-      summary: `Plan auto-approved by policy: ${plan.projectName} (${plan.budgetCents}¢).`,
+      summary: approvedInAdvance
+        ? `Plan released by the owner's standing approval: ${plan.projectName} (${plan.budgetCents}¢).`
+        : `Plan auto-approved by policy: ${plan.projectName} (${plan.budgetCents}¢).`,
       projectId: project.id,
     });
     return "completed";

@@ -7,10 +7,31 @@ import { readArtifactFiles } from "@/lib/engine/artifacts";
 import type { DeliverableVersion } from "@/lib/domain/types";
 
 export class ProviderUnavailableError extends Error {
-  constructor(message: string) {
+  /** How long the provider asked us to wait before trying again (0 = unknown). */
+  readonly retryAfterMs: number;
+
+  constructor(message: string, retryAfterMs = 0) {
     super(message);
     this.name = "ProviderUnavailableError";
+    this.retryAfterMs = Math.max(0, retryAfterMs);
   }
+}
+
+/**
+ * Providers report a cooldown as seconds ("reset_seconds": 31) or as a
+ * Retry-After header. Read both so the worker waits for the reason given
+ * instead of hammering the next attempt immediately.
+ */
+function cooldownMsFrom(body: string, retryAfter: string | null): number {
+  const reset = Number(/"reset_seconds"\s*:\s*(\d+(?:\.\d+)?)/.exec(body)?.[1]);
+  if (Number.isFinite(reset) && reset > 0) return Math.ceil(reset * 1000);
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds * 1000);
+    const at = Date.parse(retryAfter);
+    if (Number.isFinite(at)) return Math.max(0, at - Date.now());
+  }
+  return 0;
 }
 
 export class RunStoppedError extends Error {
@@ -268,30 +289,47 @@ async function callModel(messages: ChatMessage[], tools: Record<string, unknown>
     (model, index, all) => Boolean(model) && all.indexOf(model) === index,
   );
   let lastError = "Model provider returned no usable message.";
+  let cooldownMs = 0;
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1_200 * attempt));
-      const response = await fetch(`${config.openai.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${config.openai.apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          tools,
-          tool_choice: "auto",
-          temperature: 0.2,
-        }),
-        signal,
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${config.openai.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${config.openai.apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            tools,
+            tool_choice: "auto",
+            temperature: 0.2,
+          }),
+          signal,
+        });
+      } catch (error) {
+        // A dropped connection or DNS failure is infrastructure, not a failed
+        // deliverable. Surface it as an unavailable provider so the worker backs
+        // off, rather than blaming the employee and burning their attempts.
+        if (signal.aborted) throw error;
+        lastError = `Model provider unreachable: ${error instanceof Error ? error.message : String(error)}`;
+        cooldownMs = Math.max(cooldownMs, 5_000);
+        continue;
+      }
       if (!response.ok) {
         const body = await response.text().catch(() => "");
         lastError = `Model provider returned ${response.status} for ${model}: ${body.slice(0, 300) || response.statusText}`;
-        // Gateway 5xx and empty completions are transient; try the next model.
-        if (response.status >= 500) continue;
-        throw new ProviderUnavailableError(lastError);
+        const wait = cooldownMsFrom(body, response.headers.get("retry-after"));
+        // Rate limits and gateway errors are transient; try the next model, and
+        // remember the cooldown so the worker can wait it out.
+        if (response.status === 429 || response.status >= 500) {
+          cooldownMs = Math.max(cooldownMs, wait);
+          continue;
+        }
+        throw new ProviderUnavailableError(lastError, wait);
       }
       let payload: {
         choices?: { message?: { content?: string | null; tool_calls?: ToolCall[] } }[];
@@ -321,7 +359,7 @@ async function callModel(messages: ChatMessage[], tools: Record<string, unknown>
       };
     }
   }
-  throw new ProviderUnavailableError(`${lastError} (models tried: ${models.join(", ")})`);
+  throw new ProviderUnavailableError(`${lastError} (models tried: ${models.join(", ")})`, cooldownMs);
 }
 
 /**

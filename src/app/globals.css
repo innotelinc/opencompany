@@ -212,7 +212,55 @@ tr:last-child td { border-bottom: none; }
 
 .preview-frame { width: 100%; height: 420px; border: 1px solid var(--line-bright); border-radius: 8px; background: #fff; }
 
-.chat-wrap { height: 520px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg-panel); }
+.chat-wrap {
+  height: 520px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-panel);
+  /* CopilotKit ships a light theme. Pin its tokens to this palette so the
+     composer reads as part of the panel instead of merging into the page. */
+  --copilot-kit-primary-color: var(--brass);
+  --copilot-kit-contrast-color: #16140a;
+  --copilot-kit-background-color: var(--bg-panel);
+  --copilot-kit-input-background-color: #11140f;
+  --copilot-kit-secondary-color: var(--bg-raised);
+  --copilot-kit-secondary-contrast-color: var(--ink);
+  --copilot-kit-separator-color: var(--line-bright);
+  --copilot-kit-muted-color: var(--ink-faint);
+}
+
+/* The stock composer is a fixed-height pill: a long draft was clipped after a
+   few paragraphs and could not be scrolled or reviewed. Give it a real surface
+   and let the textarea scroll once it reaches nine lines. */
+.chat-wrap .copilotKitInput {
+  width: 100%;
+  min-height: 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-bright);
+  background: #11140f;
+  padding: 10px 12px;
+}
+
+.chat-wrap .copilotKitInput > textarea {
+  color: var(--ink);
+  min-height: 3rem;
+  max-height: 9rem;
+  overflow-y: auto;
+  resize: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-bright) transparent;
+}
+
+.chat-wrap .copilotKitInput > textarea::placeholder { color: var(--ink-faint); }
+
+.chat-wrap .copilotKitInput > textarea::-webkit-scrollbar { width: 9px; }
+.chat-wrap .copilotKitInput > textarea::-webkit-scrollbar-track { background: transparent; }
+.chat-wrap .copilotKitInput > textarea::-webkit-scrollbar-thumb {
+  background: var(--line-bright);
+  border-radius: 999px;
+}
+
 .chat-fallback { padding: 18px; color: var(--ink-dim); font-size: 13px; }
 
 .kv { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 6px 14px; font-size: 12.5px; }

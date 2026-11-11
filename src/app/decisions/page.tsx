@@ -1,7 +1,8 @@
 import { tryGetSession } from "@/lib/session";
 import { listDecisions, listEmployees } from "@/lib/domain/repo";
 import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
-import { DecisionActions } from "@/components/OwnerConsole";
+import { DecisionActions, StandingApprovalForm } from "@/components/OwnerConsole";
+import { getStandingApproval } from "@/lib/domain/autonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default function DecisionsPage() {
   const pending = decisions.filter((decision) => decision.status === "pending");
   const resolved = decisions.filter((decision) => decision.status !== "pending");
   const employees = new Map(listEmployees(company.id).map((employee) => [employee.id, employee]));
+  const approval = getStandingApproval(company.id);
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -36,6 +38,13 @@ export default function DecisionsPage() {
         </div>
         <Badge tone={pending.length ? "warn" : "ok"}>{pending.length} pending</Badge>
       </header>
+
+      <Panel
+        title="Standing approval"
+        hint={approval.granted ? "remembered consent" : "nothing automatic"}
+      >
+        <StandingApprovalForm approval={approval} />
+      </Panel>
 
       {pending.length === 0 ? (
         <Panel title="Nothing waiting on you">

@@ -12,6 +12,7 @@ import {
   updateTask,
 } from "@/lib/domain/repo";
 import type { Decision } from "@/lib/domain/types";
+import { matchesStandingApproval } from "@/lib/domain/autonomy";
 
 export interface DecisionActor {
   type: "human" | "employee" | "system";
@@ -45,7 +46,35 @@ export function proposeDecision(input: {
     projectId: input.projectId,
     payload: { decisionId: decision.id, kind: input.kind },
   });
-  return decision;
+
+  // The owner may have pre-approved this class of decision. Applying that
+  // remembered consent here covers every path that proposes work — the worker,
+  // routines and the chat — and records the outcome exactly once.
+  const standing = matchesStandingApproval({
+    companyId: input.companyId,
+    kind: input.kind,
+    risk: decision.risk,
+    action: input.action,
+  });
+  if (!standing.allowed) return decision;
+
+  updateDecision(input.companyId, decision.id, {
+    status: "auto_approved",
+    decidedBy: standing.approval.grantedBy ?? "owner:standing-approval",
+    resolutionNote: `Standing approval granted ${standing.approval.grantedAt ?? "earlier"}: ${standing.reason}`,
+  });
+  applyApproval(input.companyId, decision);
+  recordActivity({
+    companyId: input.companyId,
+    actorType: "human",
+    actorId: standing.approval.grantedBy,
+    type: "decision.auto_approved",
+    summary: `Standing approval used: ${decision.title}`,
+    taskId: input.taskId,
+    projectId: input.projectId,
+    payload: { decisionId: decision.id, kind: input.kind, reason: standing.reason },
+  });
+  return getDecision(input.companyId, decision.id) ?? decision;
 }
 
 /**

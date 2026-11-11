@@ -207,6 +207,15 @@ h3 { font-size: 1.1rem; margin: 0 0 0.5rem; }
 
 .card p { margin: 0; color: var(--muted); }
 
+/* Links inside body copy ("read the principles first", the contact email) are
+   not buttons, so they need the palette rules that nav and .button already have. */
+main p a, main li a, .card a, .site-footer a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+main p a:hover, main li a:hover, .card a:hover, .site-footer a:hover { color: var(--accent); }
+
 .button {
   display: inline-block;
   margin-top: 1.25rem;
