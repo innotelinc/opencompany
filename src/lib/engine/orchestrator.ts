@@ -215,6 +215,14 @@ const INFRASTRUCTURE_BLOCKERS = [
   /\b(429|500|502|503|504)\b/,
   /interrupted/i,
   /lease expired/i,
+  // A delegate or the assignee lacking the tool, or being told it has no
+  // authority, is a routing problem the team can fix — never a dead end.
+  /not granted/i,
+  /not permitted/i,
+  /cannot produce/i,
+  /observe-only/i,
+  /internal authority only/i,
+  /no assignee/i,
 ];
 
 function requiredToolFor(task: Task): string {
