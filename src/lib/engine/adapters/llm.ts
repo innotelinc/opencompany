@@ -384,10 +384,22 @@ export class LlmBackend implements AgentBackend {
     for (let step = 0; step < maxSteps; step += 1) {
       if (input.shouldStop()) throw new RunStoppedError("Run stopped: cancelled or taken over by the owner.");
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 120_000);
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, 120_000);
       let response;
       try {
         response = await callModel(messages, tools, controller.signal);
+      } catch (error) {
+        // Our own ceiling fired: a slow or cooling provider is infrastructure,
+        // not a failed employee. Surface it as an outage so the worker backs off
+        // instead of retrying immediately and burning the task's attempts.
+        if (timedOut) {
+          throw new ProviderUnavailableError("Model call exceeded the 120s ceiling.", 20_000);
+        }
+        throw error;
       } finally {
         clearTimeout(timer);
       }
