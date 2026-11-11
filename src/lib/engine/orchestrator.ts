@@ -137,13 +137,9 @@ export function recoverInterruptedRuns(companyId: string): number {
     if (!task) continue;
     if (task.cancelRequested) {
       updateTask(companyId, task.id, { status: "cancelled", blockedReason: "Cancelled by the owner." });
-    } else if (task.attemptCount < task.maxAttempts) {
-      updateTask(companyId, task.id, { status: "pending" });
     } else {
-      updateTask(companyId, task.id, {
-        status: "blocked",
-        blockedReason: "Run was interrupted and the retry budget is exhausted.",
-      });
+      // No retry ceiling: an interrupted run is re-queued until the work is done.
+      updateTask(companyId, task.id, { status: "pending", blockedReason: null });
     }
     recordRunEvent({
       companyId,
@@ -151,7 +147,7 @@ export function recoverInterruptedRuns(companyId: string): number {
       taskId: run.taskId,
       employeeId: run.employeeId,
       type: "run.interrupted",
-      message: "Lease expired; the run was not resumed mid-flight. A new attempt will start if budget remains.",
+      message: "Lease expired; the run was not resumed mid-flight. A new attempt will start.",
     });
     recordActivity({
       companyId,
@@ -789,45 +785,32 @@ function handleRunFailure(input: {
     // attempt budget instead of burning every attempt within two seconds.
     const cooldownMs = Math.min(Math.max(input.error.retryAfterMs || 30_000, 5_000), 10 * 60_000);
     recordProviderOutage({ companyId, reason: message, cooldownMs });
-    const attemptsLeft = task.attemptCount < task.maxAttempts;
-    updateTask(companyId, task.id, {
-      status: attemptsLeft ? "pending" : "blocked",
-      blockedReason: attemptsLeft ? null : `Provider unavailable: ${message}`,
-    });
-    // The employee is not broken — the task carries the blocked state.
+    // Work is never retired because the provider had a bad minute: no attempt
+    // ceiling, no terminal blocked state. It waits out the cooldown and resumes.
+    updateTask(companyId, task.id, { status: "pending", blockedReason: null });
     setEmployeeStatus(companyId, employee.id, "idle");
     recordActivity({
       companyId,
       actorType: "system",
-      type: attemptsLeft ? "provider.retry" : "provider.unavailable",
-      summary: attemptsLeft
-        ? `"${task.title}" will retry in ${Math.round(cooldownMs / 1000)}s after a provider error: ${message}`
-        : `Blocked "${task.title}" after the provider stayed unavailable: ${message}`,
+      type: "provider.retry",
+      summary: `"${task.title}" will retry in ${Math.round(cooldownMs / 1000)}s after a provider error: ${message}`,
       taskId: task.id,
     });
-    if (!attemptsLeft) result.blocked.push(task.id);
     return;
   }
 
   finishRun(companyId, run.id, "failed", { error: message });
-  const attemptsLeft = task.attemptCount < task.maxAttempts;
-  updateTask(companyId, task.id, {
-    status: attemptsLeft ? "pending" : "blocked",
-    blockedReason: attemptsLeft ? null : `Failed after ${task.attemptCount} attempt(s): ${message}`,
-  });
-  // A task that ran out of retries is blocked; the employee simply has nothing
-  // running. Leaving them in "error" made a transient failure look permanent.
+  // No attempt ceiling: a failed run returns the work to the queue so the same
+  // employee picks it up again. The employee stays idle, never "error".
+  updateTask(companyId, task.id, { status: "pending", blockedReason: null });
   setEmployeeStatus(companyId, employee.id, "idle");
   recordActivity({
     companyId,
     actorType: "system",
-    type: attemptsLeft ? "task.retry" : "task.failed",
-    summary: attemptsLeft
-      ? `"${task.title}" failed and will retry: ${message}`
-      : `"${task.title}" is blocked after retries: ${message}`,
+    type: "task.retry",
+    summary: `"${task.title}" failed and will retry: ${message}`,
     taskId: task.id,
   });
-  if (!attemptsLeft) result.blocked.push(task.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -850,10 +833,7 @@ function handlePlan(input: {
     throw new Error("Planner returned a task without acceptance criteria; refusing to dispatch unverifiable work.");
   }
   const policies = getPolicies(companyId);
-  const maxDepth = Number(policies["delegation.max_depth"] ?? getConfig().limits.maxDelegationDepth);
-  if (task.delegationDepth + 1 > maxDepth) {
-    throw new Error(`Plan would exceed the delegation depth limit (${maxDepth}).`);
-  }
+  // No delegation-depth ceiling: managers may delegate as deep as the work needs.
 
   // Plan tasks have no project yet, so resolve their goal from an existing
   // project or, failing that, the active goal whose title matches the plan task.
@@ -1182,42 +1162,8 @@ function handleReview(input: {
   }
 
   const round = reviewed.reviewRound + 1;
-  const maxRounds = reviewed.maxReviewRounds;
   updateTask(companyId, task.id, { status: "completed" });
-  if (round >= maxRounds) {
-    updateTask(companyId, reviewed.id, {
-      status: "blocked",
-      reviewRound: round,
-      blockedReason: `Review failed ${round} time(s): ${verdict.findings.join("; ")}`,
-    });
-    proposeDecision({
-      companyId,
-      requestedByEmployeeId: employee.id,
-      taskId: reviewed.id,
-      projectId: reviewed.projectId,
-      kind: "escalation",
-      title: `Review loop exhausted for "${reviewed.title}"`,
-      businessReason: `The reviewer rejected the deliverable ${round} time(s). The team cannot converge inside the review limit.`,
-      action: {
-        kind: "escalation",
-        projectId: reviewed.projectId,
-        taskId: reviewed.id,
-        findings: verdict.findings,
-        round,
-      },
-      risk: "medium",
-    });
-    result.blocked.push(reviewed.id);
-    recordActivity({
-      companyId,
-      actorType: "system",
-      type: "review.exhausted",
-      summary: `Review loop exhausted for "${reviewed.title}"; escalated to the owner.`,
-      taskId: reviewed.id,
-      projectId: reviewed.projectId,
-    });
-    return;
-  }
+  // No review-round ceiling: revisions continue until the reviewer passes the work.
 
   updateTask(companyId, reviewed.id, {
     status: "pending",
