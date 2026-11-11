@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/session";
 import { addKnowledge, editKnowledge } from "@/lib/domain/commands";
+import { deleteKnowledgeDocument } from "@/lib/domain/setup";
 import { fail, ok, readJson, unexpected } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
   try {
     const session = getSession();
     const body = await readJson<{
-      action?: "create" | "edit";
+      action?: "create" | "edit" | "delete";
       id?: string;
       title?: string;
       body?: string;
@@ -27,6 +28,17 @@ export async function POST(request: Request) {
         docId: body.id,
         body: body.body,
       });
+      return ok();
+    }
+
+    if (body.action === "delete") {
+      if (!body.id) return fail("Document id is required.");
+      const result = deleteKnowledgeDocument({
+        companyId: session.company.id,
+        ownerId: session.owner.id,
+        docId: body.id,
+      });
+      if (!result.ok) return fail(result.reason ?? "Could not remove the document.", 404);
       return ok();
     }
 

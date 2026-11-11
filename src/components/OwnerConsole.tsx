@@ -228,7 +228,6 @@ const STANDING_KIND_LABELS: { value: string; label: string; hint: string }[] = [
 export function StandingApprovalForm({ approval }: { approval: StandingApproval }) {
   const router = useRouter();
   const [kinds, setKinds] = useState<string[]>(approval.kinds);
-  const [maxCents, setMaxCents] = useState(approval.maxCents || 300);
   const [note, setNote] = useState(approval.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +243,7 @@ export function StandingApprovalForm({ approval }: { approval: StandingApproval 
     setBusy(true);
     setError(null);
     setMessage(null);
-    const result = await post("/api/autonomy", { action, kinds, maxCents, note });
+    const result = await post("/api/autonomy", { action, kinds, note });
     setBusy(false);
     if (!result.ok) {
       setError(result.error ?? "Could not save the standing approval.");
@@ -266,8 +265,8 @@ export function StandingApprovalForm({ approval }: { approval: StandingApproval 
         </span>
         {approval.granted ? (
           <span className="tiny faint">
-            granted by the owner {approval.grantedAt ? new Date(approval.grantedAt).toLocaleString() : "earlier"} · cap{" "}
-            {approval.maxCents}¢{approval.note ? ` · “${approval.note}”` : ""}
+            granted by the owner {approval.grantedAt ? new Date(approval.grantedAt).toLocaleString() : "earlier"} · no
+            ceiling{approval.note ? ` · “${approval.note}”` : ""}
           </span>
         ) : (
           <span className="tiny faint">Nothing is approved automatically until you grant it here.</span>
@@ -300,16 +299,6 @@ export function StandingApprovalForm({ approval }: { approval: StandingApproval 
 
       <div className="field-row">
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="standing-max">Ceiling per decision (cents)</label>
-          <input
-            id="standing-max"
-            type="number"
-            min={0}
-            value={maxCents}
-            onChange={(event) => setMaxCents(Number(event.target.value))}
-          />
-        </div>
-        <div className="field" style={{ marginBottom: 0 }}>
           <label htmlFor="standing-note">Why (kept in the audit trail)</label>
           <input
             id="standing-note"
@@ -332,8 +321,8 @@ export function StandingApprovalForm({ approval }: { approval: StandingApproval 
       </div>
 
       <p className="tiny faint" style={{ margin: 0 }}>
-        Credential use, data export and high-risk actions always come to you, whatever is granted here. The emergency
-        stop overrides everything.
+        The grant is unlimited inside the kinds you tick — every amount, every risk. Credential use and data export still
+        come to you, and the emergency stop overrides everything.
       </p>
       {message ? <p className="small" style={{ margin: 0 }}>{message}</p> : null}
       {error ? <p className="tiny" style={{ margin: 0, color: "var(--danger)" }}>{error}</p> : null}

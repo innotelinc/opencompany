@@ -10,11 +10,35 @@ export function KnowledgeEditor({ docId, initialBody }: { docId: string; initial
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function remove() {
+    if (!window.confirm("Remove this document and its version history? This cannot be undone.")) return;
+    setBusy(true);
+    setError(null);
+    const response = await fetch("/api/knowledge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "delete", id: docId }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setBusy(false);
+    if (!response.ok) {
+      setError(payload.error ?? "Could not remove the document.");
+      return;
+    }
+    router.refresh();
+  }
+
   if (!open) {
     return (
-      <button className="btn small" type="button" onClick={() => setOpen(true)}>
-        Edit document
-      </button>
+      <div className="row" style={{ gap: 6 }}>
+        <button className="btn small" type="button" onClick={() => setOpen(true)}>
+          Edit document
+        </button>
+        <button className="btn danger small" type="button" disabled={busy} onClick={remove}>
+          {busy ? "Removing…" : "Remove"}
+        </button>
+        {error ? <span className="tiny" style={{ color: "var(--danger)" }}>{error}</span> : null}
+      </div>
     );
   }
 

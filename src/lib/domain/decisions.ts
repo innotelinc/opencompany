@@ -53,7 +53,6 @@ export function proposeDecision(input: {
   const standing = matchesStandingApproval({
     companyId: input.companyId,
     kind: input.kind,
-    risk: decision.risk,
     action: input.action,
   });
   if (!standing.allowed) return decision;

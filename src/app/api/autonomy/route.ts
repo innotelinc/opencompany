@@ -29,7 +29,6 @@ export async function POST(request: Request) {
     const body = await readJson<{
       action?: "grant" | "revoke";
       kinds?: string[];
-      maxCents?: number;
       note?: string;
     }>(request);
 
@@ -44,7 +43,6 @@ export async function POST(request: Request) {
         companyId: session.company.id,
         ownerId: session.owner.id,
         kinds: body.kinds,
-        maxCents: Number(body.maxCents ?? 0),
         note: body.note,
       });
       if (!result.ok) return fail(result.reason ?? "Could not record the standing approval.");

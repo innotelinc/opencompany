@@ -40,7 +40,7 @@ test("nothing is approved automatically until the owner grants it", () => {
 });
 
 test("a granted standing approval is remembered and resolves matching decisions", () => {
-  const granted = grantStandingApproval({ companyId, ownerId: owner.id, kinds: ["plan"], maxCents: 100 });
+  const granted = grantStandingApproval({ companyId, ownerId: owner.id, kinds: ["plan"] });
   assert.equal(granted.ok, true);
   assert.deepEqual(getStandingApproval(companyId).kinds, ["plan"]);
   assert.equal(getStandingApproval(companyId).grantedBy, owner.id);
@@ -52,8 +52,9 @@ test("a granted standing approval is remembered and resolves matching decisions"
   assert.ok(listDecisions(companyId).some((decision) => decision.id === approved.id));
 });
 
-test("the grant is bounded: over the cap, other kinds and high risk still wait", () => {
-  assert.equal(plan(250).status, "pending");
+test("the grant has no ceiling: every amount of a granted kind is approved", () => {
+  assert.equal(plan(250).status, "auto_approved", "no amount limit inside the grant");
+  assert.equal(plan(9_000, "high").status, "auto_approved", "no risk limit inside the grant");
 
   const deploy = proposeDecision({
     companyId,
@@ -66,10 +67,7 @@ test("the grant is bounded: over the cap, other kinds and high risk still wait",
     action: { kind: "public_deploy", target: "example.test" },
     risk: "medium",
   });
-  assert.equal(deploy.status, "pending", "public_deploy was not granted");
-
-  const risky = plan(40, "high");
-  assert.equal(risky.status, "pending", "high risk always reaches the owner");
+  assert.equal(deploy.status, "pending", "kinds the owner did not grant still wait");
 });
 
 test("revoking the grant restores manual approval", () => {
