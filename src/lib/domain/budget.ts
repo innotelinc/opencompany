@@ -31,16 +31,26 @@ export function budgetSnapshot(companyId: string, policies: Record<string, unkno
   };
 }
 
-export function canDispatch(companyId: string, estimateCents: number, policies: Record<string, unknown> = {}): { ok: boolean; reason?: string; snapshot: BudgetSnapshot } {
+/**
+ * Virtual budget is bookkeeping, never a stop sign.
+ *
+ * Estimates and token usage are not charges, so crossing the monthly figure is
+ * reported as a warning and dispatch continues. The only thing that actually
+ * spends money is paying an external party, and that is an owner approval in
+ * policy.ts rather than a cap on the team.
+ */
+export function canDispatch(
+  companyId: string,
+  estimateCents: number,
+  policies: Record<string, unknown> = {},
+): { ok: true; warning?: string; snapshot: BudgetSnapshot } {
   const snapshot = budgetSnapshot(companyId, policies);
-  if (snapshot.committedCents + estimateCents > snapshot.limitCents) {
-    return {
-      ok: false,
-      reason: `Budget exhausted: ${snapshot.committedCents}¢ committed of ${snapshot.limitCents}¢, ${estimateCents}¢ needed.`,
-      snapshot,
-    };
-  }
-  return { ok: true, snapshot };
+  const projected = snapshot.committedCents + estimateCents;
+  const warning =
+    projected > snapshot.limitCents
+      ? `Virtual budget ${projected}¢ is past the ${snapshot.limitCents}¢ figure; nothing was charged and work continues.`
+      : undefined;
+  return { ok: true, warning, snapshot };
 }
 
 /** Reserve an estimate before dispatch. Estimates are visibly separate from usage. */

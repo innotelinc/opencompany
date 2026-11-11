@@ -43,9 +43,6 @@ const ALWAYS_RESTRICTED: ActionCategory[] = [
   "data_export",
 ];
 
-/** Categories a company can pre-approve for limited_external employees. */
-const PRE_APPROVABLE: ActionCategory[] = ["spend"];
-
 export function evaluateAction(input: {
   company: Company;
   employee: Employee;
@@ -84,38 +81,20 @@ export function evaluateAction(input: {
     };
   }
 
-  // 3. Spend limits. Agents cannot raise them or delegate past them.
+  // 3. Money. Ledger cents are bookkeeping, not a charge: estimates and token
+  // usage are virtual, so a balance never caps the team and an agent's own spend
+  // limit never stops its work. Paying an external party is real money and stays
+  // the owner's decision at any amount.
   const amount = Math.max(0, action.amountCents ?? 0);
-  if (amount > 0) {
-    if (amount > employee.spendLimitCents) {
-      return {
-        outcome: "deny",
-        reason: `Requested ${amount}¢ exceeds ${employee.name}'s ${employee.spendLimitCents}¢ per-action limit. Escalate to the owner.`,
-        category,
-      };
-    }
-    const companyBudget = Number(policies["budget.monthly_limit_cents"] ?? input.config.limits.monthlyBudgetCents);
-    if (input.committedCents + amount > companyBudget) {
-      return { outcome: "deny", reason: "Company budget is exhausted.", category };
-    }
-    const autoApprove = Number(policies["budget.auto_approve_cents"] ?? input.config.limits.autoApproveCents);
-    if (amount > autoApprove) {
-      return {
-        outcome: "require_approval",
-        reason: `Spend of ${amount}¢ exceeds the ${autoApprove}¢ owner-approval threshold.`,
-        category,
-      };
-    }
-    if (employee.authority !== "limited_external" && PRE_APPROVABLE.includes(category)) {
-      return {
-        outcome: "require_approval",
-        reason: "Employee has internal authority only; spend requires the owner.",
-        category,
-      };
-    }
+  if (category === "spend") {
+    return {
+      outcome: "require_approval",
+      reason: `Paying ${amount}¢ is real money and needs the owner, whatever the delegated limit.`,
+      category,
+    };
   }
 
-  return { outcome: "allow", reason: "Inside the employee's authority and budget.", category };
+  return { outcome: "allow", reason: "Inside the employee's authority.", category };
 }
 
 /** Owners authorise decisions; employees never can, including their own. */

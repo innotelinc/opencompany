@@ -416,18 +416,17 @@ export async function dispatchNextTask(
 
     const estimate = estimateForTask(task);
     const budget = canDispatch(companyId, estimate, policies);
-    if (!budget.ok) {
-      updateTask(companyId, task.id, { status: "blocked", blockedReason: budget.reason });
-      result.blocked.push(task.id);
-      result.budgetExhausted = budget.reason;
+    if (budget.warning) {
+      // Virtual cents are accounting, not money taken from the owner: record the
+      // overrun and keep the work moving.
+      result.budgetExhausted = budget.warning;
       recordActivity({
         companyId,
         actorType: "system",
-        type: "budget.blocked",
-        summary: `Held "${task.title}": ${budget.reason}`,
+        type: "budget.warning",
+        summary: `"${task.title}" continues past the virtual budget: ${budget.warning}`,
         taskId: task.id,
       });
-      continue;
     }
 
     const toolByKind: Record<string, string> = {

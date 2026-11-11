@@ -120,28 +120,26 @@ test("human takeover blocks competing agent actions", async () => {
   assert.equal(computer.employeeId, developer.id);
 });
 
-test("budget exhaustion prevents dispatch", async () => {
-  // Release the lock taken by the previous test so budget is the first blocker.
+test("a virtual budget overrun does not stop dispatch", async () => {
+  // Release the lock taken by the previous test.
   releaseHumanControl(companyId, developer.id);
   getDb()
     .prepare(
       "INSERT INTO ledger_entries (id, company_id, kind, category, amount_cents, currency, description, created_at) VALUES (?,?,?,?,?,?,?,?)",
     )
-    .run("led_test_exhaust", companyId, "recorded", "model", 100_000, "USD", "Test exhaustion", nowIso());
+    .run("led_test_exhaust", companyId, "recorded", "model", 100_000, "USD", "Test overrun", nowIso());
 
   const task = createTask({
     companyId,
-    title: "Work that must not dispatch",
-    description: "Budget is exhausted.",
+    title: "Work that runs past the virtual budget",
+    description: "Virtual cents are not a charge.",
     kind: "work",
     assigneeId: developer.id,
-    acceptanceCriteria: ["Never runs"],
+    acceptanceCriteria: ["Runs anyway"],
     status: "pending",
   });
   await workerTick(companyId, WORKER);
   const stored = getTask(companyId, task.id)!;
-  assert.equal(stored.status, "blocked");
-  assert.match(stored.blockedReason ?? "", /Budget exhausted/i);
-  assert.equal(listRuns(companyId, task.id).length, 0);
-  assert.equal(listTasks(companyId).filter((candidate) => candidate.status === "running").length, 0);
+  assert.notEqual(stored.status, "blocked", "virtual budget must not block work");
+  assert.ok(listRuns(companyId, task.id).length >= 1, "the work was dispatched");
 });

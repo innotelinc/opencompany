@@ -66,7 +66,7 @@ test("restricted actions always ask the owner", () => {
   }
 });
 
-test("spend limits and exhausted budgets deny dispatch", () => {
+test("real spending needs the owner; virtual budget never blocks", () => {
   const config = getConfig();
   const overLimit = evaluateAction({
     company: companyRow,
@@ -75,11 +75,13 @@ test("spend limits and exhausted budgets deny dispatch", () => {
     committedCents: 0,
     action: { category: "spend", summary: "buy", amountCents: 50 },
   });
-  assert.equal(overLimit.outcome, "deny");
+  assert.equal(overLimit.outcome, "require_approval", "paying money is the owner's call at any limit");
+  assert.match(overLimit.reason, /real money/);
 
-  const exhausted = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 5 });
-  assert.equal(exhausted.ok, false);
-  assert.match(exhausted.reason ?? "", /Budget exhausted/);
+  // Ledger cents are bookkeeping, not a charge: crossing the figure warns and work continues.
+  const overrun = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 5 });
+  assert.equal(overrun.ok, true);
+  assert.match(overrun.warning ?? "", /Virtual budget/);
 });
 
 test("an owner decision binds to the exact action and changes invalidate it", () => {
