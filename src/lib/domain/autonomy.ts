@@ -16,8 +16,28 @@ import { getCompany, getPolicies, recordActivity, setPolicy } from "@/lib/domain
 export const STANDING_APPROVAL_KINDS = ["plan", "spend", "external_communication", "public_deploy"] as const;
 export type StandingApprovalKind = (typeof STANDING_APPROVAL_KINDS)[number];
 
-/** Categories the owner may not delegate to a standing approval. */
-const NEVER_STANDING: string[] = ["credential_use", "data_export"];
+/** Word boundaries matter: "unpublished" is publish, "respending" is not spend. */
+function wordsOf(key: string): Set<string> {
+  return new Set(key.split(/[^a-z0-9]+/).filter(Boolean));
+}
+
+/**
+ * Categories the owner may not delegate to a standing approval, in any wording.
+ * Checked before the catalogue kinds so "approval to use the client's
+ * credentials to deploy" can never be read as a deployment.
+ */
+const NEVER_STANDING_WORDS: Record<string, string[]> = {
+  credential_use: ["credential", "credentials", "secret", "secrets", "api_key", "token", "tokens", "password", "passwords"],
+  data_export: ["export", "exports", "exporting", "exfiltration", "bulk_download"],
+};
+
+export function neverStandingKind(kind: string): string | null {
+  const words = wordsOf(normalizeKind(kind));
+  for (const [name, list] of Object.entries(NEVER_STANDING_WORDS)) {
+    if (list.some((word) => words.has(word))) return name;
+  }
+  return null;
+}
 
 /** Lower-case and unify separators so "Public Deploy" and "public-deploy" agree. */
 function normalizeKind(kind: string): string {
@@ -57,12 +77,85 @@ const KIND_ALIASES: Record<string, StandingApprovalKind> = {
 };
 
 /** Which catalogue kind a decision belongs to, or null when it is not delegable. */
+/** The words agents actually use for each catalogue kind. */
+const KIND_WORDS: { kind: StandingApprovalKind; words: string[] }[] = [
+  { kind: "plan", words: ["plan", "plans", "planning", "planned", "budget", "budgets", "roadmap", "blueprint"] },
+  {
+    kind: "public_deploy",
+    words: [
+      "deploy",
+      "deploys",
+      "deployment",
+      "deployments",
+      "deploying",
+      "publish",
+      "publishes",
+      "publishing",
+      "published",
+      "redeploy",
+      "site_publish",
+      "go_live",
+      "golive",
+    ],
+  },
+  {
+    kind: "spend",
+    words: [
+      "spend",
+      "spending",
+      "purchase",
+      "purchases",
+      "purchasing",
+      "buy",
+      "buying",
+      "payment",
+      "payments",
+      "pay",
+      "invoice",
+      "invoices",
+      "expense",
+      "expenses",
+      "refund",
+    ],
+  },
+  {
+    kind: "external_communication",
+    words: [
+      "email",
+      "emails",
+      "message",
+      "messages",
+      "messaging",
+      "outreach",
+      "newsletter",
+      "newsletters",
+      "communication",
+      "communications",
+      "communicate",
+      "send",
+      "sending",
+      "contact",
+      "campaign",
+      "announce",
+      "announcement",
+    ],
+  },
+];
+
 export function canonicalDecisionKind(kind: string): StandingApprovalKind | null {
   const key = normalizeKind(kind);
   const direct = KIND_ALIASES[key];
   if (direct) return direct;
-  if (key.startsWith("plan") || key.includes("budget")) return "plan";
-  if (key.includes("deploy") || key.includes("publish")) return "public_deploy";
+  // Irreversible categories stay out of the catalogue whatever else they mention.
+  if (neverStandingKind(kind)) return null;
+  const words = wordsOf(key);
+  for (const entry of KIND_WORDS) {
+    if (entry.words.some((word) => words.has(word))) return entry.kind;
+  }
+  // Compact forms the word list cannot see: "site-deployment", "webpublishing".
+  if (key.startsWith("plan") || key.includes("deploy") || key.includes("publish")) {
+    return key.includes("deploy") || key.includes("publish") ? "public_deploy" : "plan";
+  }
   if (key.includes("spend") || key.includes("purchase") || key.includes("payment")) return "spend";
   if (key.startsWith("external") || key.includes("message") || key.includes("email")) {
     return "external_communication";
@@ -198,8 +291,9 @@ export function matchesStandingApproval(input: {
     return { allowed: false, reason: "The emergency stop is active; nothing is decided automatically.", approval };
   }
   const normalized = normalizeKind(input.kind);
-  if (NEVER_STANDING.includes(normalized)) {
-    return { allowed: false, reason: `${normalized.replace(/_/g, " ")} can never be granted in advance.`, approval };
+  const forbidden = neverStandingKind(input.kind);
+  if (forbidden) {
+    return { allowed: false, reason: `${forbidden.replace(/_/g, " ")} can never be granted in advance.`, approval };
   }
   const canonical = canonicalDecisionKind(input.kind);
   if (!canonical) {

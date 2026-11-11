@@ -110,6 +110,46 @@ test("agent wordings for a granted kind still match the standing approval", () =
   assert.equal(credential.status, "pending", "credential use never rides on a standing approval");
 });
 
+test("multi-word agent phrasings land on the granted kind", () => {
+  grantStandingApproval({
+    companyId,
+    ownerId: owner.id,
+    kinds: ["plan", "public_deploy", "spend", "external_communication"],
+  });
+
+  const cases: [string, string][] = [
+    ["project plan approval", "auto_approved"],
+    ["approve_project_plan", "auto_approved"],
+    ["Project Plan and Budget Approval", "auto_approved"],
+    ["publishing the customer site", "auto_approved"],
+    ["public site publishing approval", "auto_approved"],
+    ["deployment approval", "auto_approved"],
+    ["spend approval for the invoice", "auto_approved"],
+    ["approve purchase", "auto_approved"],
+    ["send the client an email", "auto_approved"],
+    ["outreach to the client", "auto_approved"],
+    ["credential_use", "pending"],
+    ["Approval to use the client's credentials", "pending"],
+    ["bulk data export", "pending"],
+    ["share the data export", "pending"],
+    ["ship it", "pending"],
+  ];
+
+  for (const [kind, expected] of cases) {
+    const decision = proposeDecision({
+      companyId,
+      requestedByEmployeeId: null,
+      taskId: null,
+      projectId: null,
+      kind,
+      title: `Wording: ${kind}`,
+      businessReason: "Wording check.",
+      action: {},
+    });
+    assert.equal(decision.status, expected, `"${kind}" should be ${expected}`);
+  }
+});
+
 test("revoking the grant restores manual approval", () => {
   revokeStandingApproval({ companyId, ownerId: owner.id });
   assert.equal(getStandingApproval(companyId).granted, false);
