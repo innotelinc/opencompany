@@ -214,8 +214,8 @@ export function DecisionActions({
 }
 
 const STANDING_KIND_LABELS: { value: string; label: string; hint: string }[] = [
-  { value: "plan", label: "Plans and budgets", hint: "Release CEO plans that fit the cap without a manual approval." },
-  { value: "spend", label: "Spend inside the cap", hint: "Cover purchases at or below the cap." },
+  { value: "plan", label: "Plans and budgets", hint: "Release CEO plans without a manual approval, at any budget." },
+  { value: "spend", label: "Spending", hint: "Approve purchases of any size without waiting for the desk." },
   { value: "external_communication", label: "External messages", hint: "Send prepared messages to prepared recipients." },
   { value: "public_deploy", label: "Public deployment", hint: "Publish a reviewed artifact. Hard to recall once it starts." },
 ];
