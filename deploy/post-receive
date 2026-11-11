@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Installed into the bare mirror's hooks by deploy/install-git-deploy.sh.
+# Pushing to main deploys that commit; nothing is copied by hand.
+#
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+
+echo "[deploy] $(date -Is) push received"
+
+while read -r _old new ref; do
+  case "$ref" in
+    refs/heads/main) ;;
+    *) continue ;;
+  esac
+  if echo "$new" | grep -q '^0*$'; then
+    echo "[deploy] main was deleted; nothing to deploy"
+    exit 0
+  fi
+done
+
+exec /opt/opencompany/scripts/deploy.sh main

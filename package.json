@@ -13,6 +13,7 @@
     "dev:all": "node scripts/dev-all.mjs",
     "build": "next build",
     "start": "next start -p 3000",
+    "deploy": "bash scripts/deploy.sh",
     "worker": "tsx src/worker/main.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
