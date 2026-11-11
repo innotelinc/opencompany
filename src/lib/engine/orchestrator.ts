@@ -234,11 +234,54 @@ function requiredToolFor(task: Task): string {
  * controls (emergency stop, cancellation, a computer they hold, a paused
  * employee) are respected: those are decisions, not hindrances.
  */
+/**
+ * One pass per piece of work. Hourly routines and re-queued passes can pile up
+ * identical tasks; the oldest queued one is kept and the rest collapse, so the
+ * team never repeats the same pass.
+ */
+export function dedupeQueuedTasks(companyId: string): string[] {
+  const pending = listTasks(companyId)
+    .filter((task) => task.status === "pending")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const seen = new Set<string>();
+  const collapsed: string[] = [];
+
+  for (const task of pending) {
+    const signature = `${task.kind}:${task.title}`;
+    if (!seen.has(signature)) {
+      seen.add(signature);
+      continue;
+    }
+    updateTask(companyId, task.id, {
+      status: "cancelled",
+      blockedReason: "Duplicate of an identical pass already queued.",
+    });
+    recordActivity({
+      companyId,
+      actorType: "system",
+      type: "task.deduplicated",
+      summary: `Collapsed a duplicate "${task.title}" into the pass already queued.`,
+      taskId: task.id,
+      projectId: task.projectId,
+    });
+    collapsed.push(task.id);
+  }
+
+  return collapsed;
+}
+
 export function recoverBlockedTasks(companyId: string): string[] {
   const company = getCompany(companyId);
   if (!company || company.haltedAt) return [];
 
   const healed: string[] = [];
+  const active = new Set(
+    listTasks(companyId)
+      .filter((candidate) =>
+        ["pending", "running", "awaiting_review", "awaiting_approval"].includes(candidate.status),
+      )
+      .map((candidate) => `${candidate.kind}:${candidate.title}`),
+  );
   const roster = listEmployees(companyId).filter(
     (member) => !member.paused && member.authority !== "observe" && member.status !== "error",
   );
@@ -248,6 +291,26 @@ export function recoverBlockedTasks(companyId: string): string[] {
     if (task.cancelRequested) continue;
     const reason = task.blockedReason ?? "";
     if (/cancel/i.test(reason) || /owner rejected/i.test(reason)) continue;
+
+    // An identical pass is already queued or running: fold this one into it
+    // instead of queueing the same work twice.
+    const signature = `${task.kind}:${task.title}`;
+    if (active.has(signature)) {
+      updateTask(companyId, task.id, {
+        status: "cancelled",
+        blockedReason: "Duplicate of an identical pass already queued.",
+      });
+      recordActivity({
+        companyId,
+        actorType: "system",
+        type: "task.deduplicated",
+        summary: `Collapsed a duplicate "${task.title}" into the pass already queued.`,
+        taskId: task.id,
+        projectId: task.projectId,
+      });
+      healed.push(task.id);
+      continue;
+    }
 
     const assignee = task.assigneeId ? getEmployee(companyId, task.assigneeId) : null;
     if (assignee) {
@@ -1374,6 +1437,7 @@ export async function workerTick(companyId: string, workerId: string): Promise<T
   result.recovered += recoverInterruptedRuns(companyId);
   result.recovered += recoverStaleExternalActions(companyId);
   result.recovered += recoverBlockedTasks(companyId).length;
+  result.recovered += dedupeQueuedTasks(companyId).length;
   runDueRoutines(companyId);
 
   for (const action of approvedExternalActions(companyId).slice(0, 3)) {
