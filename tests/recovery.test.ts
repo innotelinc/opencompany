@@ -30,6 +30,32 @@ test.after(() => {
   cleanup();
 });
 
+test("asking for the same keyed task twice hands back the first one", () => {
+  const first = createTask({
+    companyId,
+    title: "Plan: replayed creation",
+    description: "First row wins.",
+    kind: "work",
+    assigneeId: developer.id,
+    idempotencyKey: "replay:plan:1",
+  });
+  const second = createTask({
+    companyId,
+    title: "Plan: replayed creation",
+    description: "Second caller gets the existing row.",
+    kind: "work",
+    assigneeId: developer.id,
+    idempotencyKey: "replay:plan:1",
+  });
+  assert.equal(second.id, first.id, "a duplicate create is not an error");
+  assert.equal(second.description, "First row wins.");
+  assert.equal(
+    listTasks(companyId).filter((task) => task.idempotencyKey === "replay:plan:1").length,
+    1,
+    "only one row exists for the key",
+  );
+});
+
 test("an expired lease is recovered and the work retried exactly once", async () => {
   const task = createTask({
     companyId,

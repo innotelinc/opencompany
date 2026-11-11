@@ -457,6 +457,15 @@ export function createTask(input: {
   idempotencyKey?: string | null;
 }): Task {
   const db = getDb();
+  // Asking for the same keyed task twice is not an error: the first row already
+  // stands for that piece of work, so hand it back instead of failing the run
+  // that asked for it.
+  if (input.idempotencyKey) {
+    const existing = db
+      .prepare("SELECT id FROM tasks WHERE company_id = ? AND idempotency_key = ?")
+      .get(input.companyId, input.idempotencyKey) as { id: string } | undefined;
+    if (existing) return getTask(input.companyId, existing.id)!;
+  }
   const id = newId("task");
   const now = nowIso();
   const insert = db.transaction(() => {
