@@ -72,20 +72,32 @@ async function main() {
     return;
   }
 
+  // A tick blocks for as long as an agent is working, which can be minutes. The
+  // lease must be refreshed on a timer, not from the loop, or the UI and the
+  // health check report a busy worker as offline while it is doing real work.
+  const beat = setInterval(() => {
+    try {
+      heartbeat();
+    } catch (error) {
+      log(`heartbeat failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, 5_000);
+
   const shutdown = (signal: string) => {
     if (stopping) return;
     stopping = true;
+    clearInterval(beat);
     log(`${signal} received; finishing the current tick and exiting.`);
   };
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 
   while (!stopping) {
-    heartbeat();
     await tickOnce();
     if (stopping) break;
     await new Promise((resolve) => setTimeout(resolve, getConfig().limits.workerPollMs));
   }
+  clearInterval(beat);
   closeDb();
   log("stopped.");
 }
