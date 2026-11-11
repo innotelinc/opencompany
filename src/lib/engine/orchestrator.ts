@@ -205,6 +205,108 @@ function runDueRoutines(companyId: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Self-healing: blocked work does not stay blocked
+// ---------------------------------------------------------------------------
+
+/** Reasons that mean "try again later", not "this work is impossible". */
+const INFRASTRUCTURE_BLOCKERS = [
+  /provider/i,
+  /unavailable/i,
+  /fetch failed/i,
+  /timed out/i,
+  /timeout/i,
+  /cooling/i,
+  /\b(429|500|502|503|504)\b/,
+  /interrupted/i,
+  /lease expired/i,
+];
+
+function requiredToolFor(task: Task): string {
+  return (
+    { plan: "task.plan", work: "files.write", review: "review.approve", report: "report.write" }[task.kind] ??
+    "files.write"
+  );
+}
+
+/**
+ * Nothing an agent needs stays blocked on its own.
+ *
+ * A provider cooldown, a dropped connection or an exhausted retry budget is a
+ * reason to try again, so the task is re-queued with a fresh attempt budget. When
+ * the blocker is the assignee's own capability — no file writing, observe-only
+ * authority — a colleague who *can* do the work takes it over. The owner's own
+ * controls (emergency stop, cancellation, a computer they hold, a paused
+ * employee) are respected: those are decisions, not hindrances.
+ */
+export function recoverBlockedTasks(companyId: string): string[] {
+  const company = getCompany(companyId);
+  if (!company || company.haltedAt) return [];
+
+  const healed: string[] = [];
+  const roster = listEmployees(companyId).filter(
+    (member) => !member.paused && member.authority !== "observe" && member.status !== "error",
+  );
+
+  for (const task of listTasks(companyId).filter((candidate) => candidate.status === "blocked")) {
+    if (healed.length >= 5) break;
+    if (task.cancelRequested) continue;
+    const reason = task.blockedReason ?? "";
+    if (/cancel/i.test(reason) || /owner rejected/i.test(reason)) continue;
+
+    const assignee = task.assigneeId ? getEmployee(companyId, task.assigneeId) : null;
+    if (assignee) {
+      if (assignee.paused) continue;
+      if (humanHoldsControl(getComputerForEmployee(companyId, assignee.id))) continue;
+    }
+
+    const tool = requiredToolFor(task);
+    const capabilityBlocked =
+      !assignee || assignee.authority === "observe" || !assignee.allowedTools.includes(tool);
+    const infrastructureBlocked = INFRASTRUCTURE_BLOCKERS.some((pattern) => pattern.test(reason));
+
+    if (!capabilityBlocked && !infrastructureBlocked) continue;
+
+    if (capabilityBlocked) {
+      const successor = roster.find((member) => member.id !== assignee?.id && member.allowedTools.includes(tool));
+      if (!successor) continue;
+      updateTask(companyId, task.id, {
+        assigneeId: successor.id,
+        status: "pending",
+        attemptCount: 0,
+        blockedReason: null,
+      });
+      if (successor.status !== "idle") setEmployeeStatus(companyId, successor.id, "idle");
+      recordActivity({
+        companyId,
+        actorType: "system",
+        type: "task.reassigned",
+        summary: `"${task.title}" moved to ${successor.name} (${successor.title}); ${assignee?.name ?? "the previous assignee"} could not do it (${reason.slice(0, 140)}).`,
+        taskId: task.id,
+        projectId: task.projectId,
+      });
+      healed.push(task.id);
+      continue;
+    }
+
+    updateTask(companyId, task.id, { status: "pending", attemptCount: 0, blockedReason: null });
+    if (assignee && (assignee.status === "blocked" || assignee.status === "error")) {
+      setEmployeeStatus(companyId, assignee.id, "idle");
+    }
+    recordActivity({
+      companyId,
+      actorType: "system",
+      type: "task.unblocked",
+      summary: `"${task.title}" re-queued with a fresh attempt budget after: ${reason.slice(0, 140) || "no reason recorded"}.`,
+      taskId: task.id,
+      projectId: task.projectId,
+    });
+    healed.push(task.id);
+  }
+
+  return healed;
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
@@ -1325,6 +1427,7 @@ export async function workerTick(companyId: string, workerId: string): Promise<T
   };
   result.recovered += recoverInterruptedRuns(companyId);
   result.recovered += recoverStaleExternalActions(companyId);
+  result.recovered += recoverBlockedTasks(companyId).length;
   runDueRoutines(companyId);
 
   for (const action of approvedExternalActions(companyId).slice(0, 3)) {
