@@ -635,7 +635,7 @@ export async function executeClaimedRun(input: {
         risk?: string;
       }) => {
         decisionRequested = true;
-        proposeDecision({
+        const decision = proposeDecision({
           companyId,
           requestedByEmployeeId: employee.id,
           taskId: task.id,
@@ -646,6 +646,10 @@ export async function executeClaimedRun(input: {
           action: inputDecision.action,
           risk: inputDecision.risk,
         });
+        // The owner's standing approval may have resolved this request the moment
+        // it was made. Parking the task then would block work the owner already
+        // released, so the task keeps running instead.
+        if (decision.status !== "pending") return;
         updateTask(companyId, task.id, {
           status: "awaiting_approval",
           blockedReason: "Waiting for the owner's decision.",
