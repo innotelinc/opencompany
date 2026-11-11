@@ -29,14 +29,14 @@ export function parseBrief(text: string): BriefFacts {
   };
   const sectionsRaw = get("Sections", "Home, About, Services, Contact");
   return {
-    customer: get("Customer", "Larkspur & Ledger"),
+    customer: get("Customer", "New client"),
     industry: get("Industry", "independent bookkeeping studio"),
     sections: sectionsRaw
       .split(",")
       .map((section) => section.trim())
       .filter(Boolean),
     tone: get("Tone", "calm, precise, human"),
-    contactEmail: get("Contact email", "hello@larkspur-ledger.test"),
+    contactEmail: get("Contact email", "hello@example.test"),
     primaryColor: get("Primary color", "#1f3d34"),
     accentColor: get("Accent color", "#d8a24a"),
     notes: get("Notes", "Small business owners who want clear numbers and no surprises."),

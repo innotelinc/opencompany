@@ -60,17 +60,17 @@ export function ActionButton({
 export function BriefForm({ defaultBudget = 500 }: { defaultBudget?: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("Prepare a small website for Larkspur & Ledger");
+  const [title, setTitle] = useState("Prepare a small website for a new client");
   const [brief, setBrief] = useState(
     "Prepare a small website for this customer using the attached requirements. Keep it to three pages, run the checks, and bring me the deployment decision before anything is published.",
   );
   const [requirements, setRequirements] = useState(
     [
-      "Customer: Larkspur & Ledger",
+      "Customer: New client",
       "Industry: independent bookkeeping studio",
       "Sections: Home, About, Services, Contact",
       "Tone: calm, precise, human",
-      "Contact email: hello@larkspur-ledger.test",
+      "Contact email: hello@example.test",
       "Primary color: #1f3d34",
       "Accent color: #d8a24a",
       "Notes: Small business owners who want clear numbers and no surprises.",
