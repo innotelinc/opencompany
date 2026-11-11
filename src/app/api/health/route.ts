@@ -3,6 +3,7 @@ import { getDb, nowIso } from "@/lib/db";
 import { getConfig, liveModelConfigured } from "@/lib/config";
 import { getSession } from "@/lib/session";
 import { workerStatus } from "@/lib/domain/ops";
+import { getProviderHealth } from "@/lib/domain/provider";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export async function GET() {
       backend: getConfig().agentBackend,
       liveModel: liveModelConfigured(),
       worker: workerStatus(),
+      provider: getProviderHealth(session.company.id),
     });
   } catch (error) {
     return NextResponse.json(

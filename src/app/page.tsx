@@ -67,6 +67,17 @@ export default function BoardroomPage() {
         </div>
       ) : null}
 
+      {dash.provider.coolingDown ? (
+        <div className="banner info">
+          <span>
+            <strong>Model provider cooling down.</strong> Dispatch resumes in {dash.provider.cooldownSeconds}s
+            {dash.provider.lastOutageReason ? ` — ${dash.provider.lastOutageReason}` : ""}. Tasks stay pending; nothing
+            has failed and no attempt was spent.
+          </span>
+          <Link href="/admin" className="small">Provider detail →</Link>
+        </div>
+      ) : null}
+
       {!live ? (
         <div className="banner info">
           <span>

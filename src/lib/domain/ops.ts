@@ -2,6 +2,7 @@ import { getDb, parseJson } from "@/lib/db";
 import { listExternalActions, listDeliverables, listEmployees, listTasks } from "@/lib/domain/repo";
 import { budgetSnapshot } from "@/lib/domain/budget";
 import { getPolicies } from "@/lib/domain/repo";
+import { getProviderHealth } from "@/lib/domain/provider";
 
 export function workerStatus(): { alive: boolean; workerId: string | null; lastHeartbeat: string | null; ageSeconds: number | null } {
   const row = getDb()
@@ -43,5 +44,6 @@ export function companyDashboard(companyId: string) {
     byStatus,
     recentEvents,
     worker: workerStatus(),
+    provider: getProviderHealth(companyId),
   };
 }

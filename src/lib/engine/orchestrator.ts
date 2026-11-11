@@ -38,7 +38,6 @@ import {
   setComputerStatus,
   setDeliverableStatus,
   setEmployeeStatus,
-  setPolicy,
   updateGoalStatus,
   updateRoutineAfterRun,
   updateTask,
@@ -46,6 +45,7 @@ import {
 } from "@/lib/domain/repo";
 import { budgetSnapshot, canDispatch, recordSimulatedUsage, reserveEstimate, settleRunUsage } from "@/lib/domain/budget";
 import { proposeDecision } from "@/lib/domain/decisions";
+import { clearProviderOutage, getProviderHealth, recordProviderOutage } from "@/lib/domain/provider";
 import { evaluateAction } from "@/lib/policy";
 import { ComputerBusyError, EmployeeWorkspace, ensureDir } from "@/lib/computers/workspace";
 import { persistFiles, readArtifactFiles } from "@/lib/engine/artifacts";
@@ -218,8 +218,7 @@ export async function dispatchNextTask(
   const policies = getPolicies(companyId);
   // The provider told us to wait (cooldown, gateway outage). Hold dispatch until
   // then instead of re-burning the same attempts inside the cooldown window.
-  const cooldownUntil = Date.parse(String(policies["provider.cooldown_until"] ?? ""));
-  if (Number.isFinite(cooldownUntil) && cooldownUntil > Date.now()) return false;
+  if (getProviderHealth(companyId).coolingDown) return false;
 
   for (const task of listReadyTasks(companyId)) {
     if (!task.assigneeId) {
@@ -687,12 +686,7 @@ function handleRunFailure(input: {
     // Wait out the provider's own cooldown (bounded), then retry inside the same
     // attempt budget instead of burning every attempt within two seconds.
     const cooldownMs = Math.min(Math.max(input.error.retryAfterMs || 30_000, 5_000), 10 * 60_000);
-    setPolicy(
-      companyId,
-      "provider.cooldown_until",
-      new Date(Date.now() + cooldownMs).toISOString(),
-      "Dispatch pauses until this time after the model provider reported a cooldown or outage.",
-    );
+    recordProviderOutage({ companyId, reason: message, cooldownMs });
     const attemptsLeft = task.attemptCount < task.maxAttempts;
     updateTask(companyId, task.id, {
       status: attemptsLeft ? "pending" : "blocked",
@@ -1342,6 +1336,9 @@ export async function workerTick(companyId: string, workerId: string): Promise<T
   while (dispatched < 2 && (await dispatchNextTask(companyId, workerId, result))) {
     dispatched += 1;
   }
+
+  // Any completed run proves the provider is answering again.
+  if (result.completed.length > 0) clearProviderOutage(companyId);
 
   const companies = getCompany(companyId);
   if (companies && !companies.haltedAt) {

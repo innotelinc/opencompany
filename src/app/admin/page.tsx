@@ -11,6 +11,7 @@ import {
 import { budgetSnapshot } from "@/lib/domain/budget";
 import { getPolicies } from "@/lib/domain/repo";
 import { workerStatus } from "@/lib/domain/ops";
+import { getProviderHealth } from "@/lib/domain/provider";
 import { ALL_CHECKS, checkDescription } from "@/lib/engine/checks";
 import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
@@ -30,6 +31,7 @@ export default function AdministrationPage() {
   const reports = listReports(company.id);
   const routines = listRoutines(company.id);
   const worker = workerStatus();
+  const provider = getProviderHealth(company.id);
   const unknown = listTasks(company.id).filter((task) => task.status === "blocked");
 
   return (
@@ -73,6 +75,39 @@ export default function AdministrationPage() {
             />
             {unknown.length ? <span className="tiny faint">{unknown.length} blocked task(s) need attention</span> : null}
           </div>
+        </Panel>
+
+        <Panel title="Model provider" hint="Gateway health">
+          <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+            <Badge tone={provider.coolingDown ? "warn" : provider.consecutiveOutages > 0 ? "info" : "ok"}>
+              {provider.coolingDown
+                ? `cooling down · ${provider.cooldownSeconds}s`
+                : provider.consecutiveOutages > 0
+                  ? "recovered"
+                  : "healthy"}
+            </Badge>
+            {provider.consecutiveOutages > 0 ? (
+              <span className="tiny faint">{provider.consecutiveOutages} outage(s) since the last successful run</span>
+            ) : null}
+          </div>
+          <dl className="kv">
+            <dt>Dispatch</dt>
+            <dd>
+              {provider.coolingDown
+                ? `Paused until ${provider.cooldownUntil ? new Date(provider.cooldownUntil).toLocaleTimeString() : "the cooldown expires"}`
+                : "Running normally"}
+            </dd>
+            <dt>Last outage</dt>
+            <dd>{provider.lastOutageAt ? relativeTime(provider.lastOutageAt) : "none recorded"}</dd>
+            <dt>Reason</dt>
+            <dd className="mono tiny" style={{ wordBreak: "break-word" }}>
+              {provider.lastOutageReason ?? "—"}
+            </dd>
+          </dl>
+          <p className="tiny faint" style={{ marginTop: 10 }}>
+            A cooling provider is infrastructure, not a failed employee: the worker waits out the window the provider asked
+            for instead of spending a task&apos;s attempts, and the employee returns to idle.
+          </p>
         </Panel>
 
         <Panel title="Budgets and usage" hint="Estimates are not invoices">
