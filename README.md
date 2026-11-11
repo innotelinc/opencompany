@@ -182,6 +182,26 @@ trusted machine: add real authentication, put the worker in a container, set
 `OPENCOMPANY_MONTHLY_BUDGET_CENTS`, and configure a secret store for provider
 credentials. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
+## Deploying
+
+Production runs from a git checkout, never from copied files. On the host:
+
+```bash
+cd /opt/opencompany
+npm run deploy          # fetch origin/main, reset, build, restart, health check
+```
+
+`scripts/deploy.sh` hard-resets the working tree to `origin/main`, installs dependencies only when `package.json` or `package-lock.json` moved, builds, restarts the web and worker services, then verifies `/api/health`. A failed build stops before the restart, so the previous build keeps serving.
+
+Pushing to the host's bare mirror deploys too: the mirror's `post-receive` hook runs the same script.
+
+```bash
+git remote add deploy ssh://root@<host>/srv/opencompany.git   # once
+git push deploy main
+```
+
+The mirror is `/srv/opencompany.git`. On a host that was deployed by copying files, `deploy/install-git-deploy.sh` adopts the directory as a checkout and seeds the mirror from a `git bundle`, because the host has no GitHub credentials of its own.
+
 ## License
 
 Application code is MIT (see [LICENSE](LICENSE)). Upstream projects were
