@@ -190,6 +190,13 @@ COOLIFY_APP_UUID=...   # the application's uuid, not its name
 OPENCOMPANY_DEPLOY_NAME=opencompany-site
 ```
 
+Two things bite when wiring this up. The token is a Sanctum token presented as
+`<row id>|<secret>`, so it must keep its `id|` prefix. And Coolify answers API
+calls only from addresses in its `allowed_ips` setting: put the worker's address
+in that list, or point `COOLIFY_BASE_URL` at the private address (for example
+`http://192.168.1.93:8000`), since loopback and the public hostname are not in a
+`192.168.1.0/24` allowlist.
+
 Coolify publishes from its own sources, so it cannot be handed the artifact
 files: the executor assembles the package locally (with `DEPLOYMENT.md`, for the
 audit trail), triggers a deployment of the configured application, waits for it
