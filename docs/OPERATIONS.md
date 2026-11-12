@@ -176,28 +176,35 @@ launch inside the employee workspace only. The local install was verified by
 launching Chromium and rendering a page; the server deploy currently has
 `OPENCOMPANY_BROWSER_ENABLED=0` because no Chromium is installed there.
 
-## Publishing to Vercel
+## Publishing through Coolify
 
-`deployment_package` publishes an owner-approved deliverable through Vercel's
-REST API; no CLI is needed at runtime. Set these on the worker's host (never in
-the browser or a tracked file):
+`deployment_package` publishes an owner-approved deliverable through Coolify's
+REST API on `deploy.innotel.us`; no CLI is needed at runtime. Set these on the
+worker's host (never in the browser or a tracked file):
 
 ```sh
-OPENCOMPANY_DEPLOY_PROVIDER=vercel
-VERCEL_TOKEN=...          # https://vercel.com/account/tokens
-VERCEL_PROJECT_ID=prj_... # Project Settings → General
-VERCEL_TEAM_ID=...        # optional, for team-owned projects
+OPENCOMPANY_DEPLOY_PROVIDER=coolify
+COOLIFY_BASE_URL=https://deploy.innotel.us
+COOLIFY_TOKEN=...      # Coolify → Keys & Tokens → API tokens
+COOLIFY_APP_UUID=...   # the application's uuid, not its name
 OPENCOMPANY_DEPLOY_NAME=opencompany-site
 ```
 
-Until both `VERCEL_TOKEN` and `VERCEL_PROJECT_ID` are present, an approved
+Coolify publishes from its own sources, so it cannot be handed the artifact
+files: the executor assembles the package locally (with `DEPLOYMENT.md`, for the
+audit trail), triggers a deployment of the configured application, waits for it
+to finish, then fetches the public domain once. The outcome records whether the
+URL was reachable, so `succeeded` means published rather than merely accepted.
+Until both `COOLIFY_TOKEN` and `COOLIFY_APP_UUID` are present, an approved
 deployment is packaged locally and recorded as **blocked** with the provider
-reason; it is not published. When they are present, the executor uploads only
-the approved artifact files, waits for the deployment to become `READY`, and
-fetches the public URL once. The outcome records whether the URL was reachable,
-so `succeeded` means published rather than merely accepted. The action is still
-claimed exactly once: a failed or uncertain publication is never retried
-automatically, and a changed artifact invalidates the approval hash.
+reason; it is not published. The action is still claimed exactly once: a failed
+or uncertain publication is never retried automatically, and a changed artifact
+invalidates the approval hash.
 
-Note Vercel's Hobby plan is for non-commercial use; confirm the plan fits before
-treating a deployment as production.
+### Vercel instead
+
+Set `OPENCOMPANY_DEPLOY_PROVIDER=vercel` with `VERCEL_TOKEN` and
+`VERCEL_PROJECT_ID` (optional `VERCEL_TEAM_ID`). That path uploads the approved
+artifact files directly through Vercel's REST API. Vercel's Hobby plan is for
+non-commercial use; confirm the plan fits before treating a deployment as
+production.

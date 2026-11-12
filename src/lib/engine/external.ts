@@ -14,6 +14,7 @@ import {
   updateDecision,
 } from "@/lib/domain/repo";
 import { readArtifactFiles } from "@/lib/engine/artifacts";
+import { publishToCoolify } from "@/lib/engine/coolify";
 import { publishToVercel } from "@/lib/engine/vercel";
 
 /**
@@ -37,11 +38,28 @@ type DeploymentTarget = {
   projectId: string;
   teamId: string;
   projectName: string;
+  baseUrl: string;
 };
 
 /** Provider state for deployment actions. Secrets stay server-side and are never logged. */
 function deploymentTarget(): DeploymentTarget {
   const { deployment } = getConfig();
+  if (deployment.provider === "coolify") {
+    const { baseUrl, token, appUuid, projectName } = deployment.coolify;
+    const configured = Boolean(token && appUuid);
+    return {
+      id: "coolify",
+      configured,
+      note: configured
+        ? `Deploys the approved artifact through Coolify at ${baseUrl} and checks the public URL.`
+        : `No public deployment provider is configured. Set COOLIFY_TOKEN and COOLIFY_APP_UUID to publish approved deployments through ${baseUrl}.`,
+      token,
+      projectId: appUuid,
+      teamId: "",
+      projectName,
+      baseUrl,
+    };
+  }
   if (deployment.provider === "vercel") {
     const { token, projectId, teamId, projectName } = deployment.vercel;
     const configured = Boolean(token && projectId);
@@ -55,16 +73,18 @@ function deploymentTarget(): DeploymentTarget {
       projectId,
       teamId,
       projectName,
+      baseUrl: "",
     };
   }
   return {
     id: deployment.provider || "none",
     configured: false,
-    note: `No adapter is installed for deployment provider "${deployment.provider}". Set OPENCOMPANY_DEPLOY_PROVIDER=vercel.`,
+    note: `No adapter is installed for deployment provider "${deployment.provider}". Set OPENCOMPANY_DEPLOY_PROVIDER=coolify (or vercel).`,
     token: "",
     projectId: "",
     teamId: "",
     projectName: "",
+    baseUrl: "",
   };
 }
 
@@ -194,10 +214,18 @@ async function runAdapter(companyId: string, actionId: string): Promise<External
 
     const provider = deploymentTarget();
     if (provider.configured) {
-      const published = await publishToVercel(publishable, provider);
+      const published =
+        provider.id === "coolify"
+          ? await publishToCoolify(publishable, {
+              baseUrl: provider.baseUrl,
+              token: provider.token,
+              appUuid: provider.projectId,
+              projectName: provider.projectName,
+            })
+          : await publishToVercel(publishable, provider);
       const summary =
         `# Deployment package\n\nPrepared for: ${action.target}\nDeliverable version: ${version.version}\n` +
-        `Files: ${publishable.size}\nProvider: Vercel project "${provider.projectName}"\n` +
+        `Files: ${publishable.size}\nProvider: ${provider.id} "${provider.projectName}"\n` +
         (published.ok
           ? `Public URL: ${published.url}\nReachable after deploy: ${published.reachable ? "yes" : "not confirmed"}\n`
           : `Publication failed: ${published.reason}\n`) +
@@ -207,7 +235,7 @@ async function runAdapter(companyId: string, actionId: string): Promise<External
         status: published.ok ? "succeeded" : "failed",
         result: {
           published: published.ok,
-          provider: "vercel",
+          provider: provider.id,
           url: published.ok ? published.url : null,
           reachable: published.ok ? published.reachable : false,
           reason: published.ok ? undefined : published.reason,
@@ -223,7 +251,7 @@ async function runAdapter(companyId: string, actionId: string): Promise<External
       `# Deployment package\n\nPrepared for: ${action.target}\nDeliverable version: ${version.version}\nFiles: ${files.size}\n\n` +
         `This package was assembled locally from an owner-approved deliverable.\n` +
         `No public deployment provider is configured, so nothing was published.\n` +
-        `Set VERCEL_TOKEN and VERCEL_PROJECT_ID to publish it.\n`,
+        `${adapter.note}\n`,
       "utf8",
     );
     return {
