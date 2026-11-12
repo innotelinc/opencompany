@@ -218,6 +218,24 @@ journalctl -u opencompany-autodeploy -n 50   # what it did, and when
 systemctl list-timers opencompany-autodeploy.timer
 ```
 
+The Coolify instance deploys on the same push through a GitHub webhook, because
+the webhook runs in the other direction: Coolify is reachable at
+`deploy.innotel.us`, so GitHub calls it. The hook points at
+`/webhooks/source/github/events/manual` with the `push` event, and the shared
+secret lives per application in `manual_webhook_secret_github` (encrypted at
+rest — set it through the framework, never with raw SQL). Coolify verifies
+`X-Hub-Signature-256` against the raw body and refuses anything else with
+`No matching application or invalid signature.`
+
+```sh
+gh api repos/innotelinc/opencompany/hooks --jq '.[] | {id, events, active}'
+gh api repos/innotelinc/opencompany/hooks/710665888/deliveries --jq '.[0:3] | .[] | {event, status_code}'
+```
+
+So one push does both: the box pulls within a minute, and Coolify starts a build
+immediately. The two are independent — a failed build on one side does not stop
+the other, and both leave the previous version serving.
+
 ### The public site
 
 The company's own site is React (`src/lib/public-site/site.tsx`), rendered to
