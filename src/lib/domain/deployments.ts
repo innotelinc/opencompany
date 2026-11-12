@@ -153,10 +153,18 @@ interface CoolifyDeployment {
   finished_at?: string;
 }
 
-/** Coolify's own deployment list, when this host has a token for it. */
-export async function coolifyDeployments(limit = 8): Promise<DeploymentRow[]> {
+/**
+ * Coolify's own deployment list, when this host has a token for it. Returns the
+ * reason it is empty, because "not configured" and "Coolify is down" are
+ * different problems and the console should not conflate them.
+ */
+export async function coolifyDeployments(
+  limit = 8,
+): Promise<{ rows: DeploymentRow[]; error?: "not-configured" | string }> {
   const { deployment } = getConfig();
-  if (!deployment.coolify.token || !deployment.coolify.appUuid) return [];
+  if (!deployment.coolify.token || !deployment.coolify.appUuid) {
+    return { rows: [], error: "not-configured" };
+  }
   try {
     const response = await fetch(
       `${deployment.coolify.baseUrl}/api/v1/deployments/applications/${encodeURIComponent(deployment.coolify.appUuid)}`,
@@ -165,10 +173,10 @@ export async function coolifyDeployments(limit = 8): Promise<DeploymentRow[]> {
         signal: AbortSignal.timeout(2_500),
       },
     );
-    if (!response.ok) return [];
+    if (!response.ok) return { rows: [], error: `Coolify answered ${response.status}` };
     const body = (await response.json()) as CoolifyDeployment[] | { deployments?: CoolifyDeployment[] };
     const list = Array.isArray(body) ? body : (body.deployments ?? []);
-    return list
+    const rows = list
       .filter((entry) => entry.created_at)
       .slice(0, limit)
       .map((entry) => {
@@ -188,8 +196,9 @@ export async function coolifyDeployments(limit = 8): Promise<DeploymentRow[]> {
           detail: entry.uuid ? `deployment ${entry.uuid}` : undefined,
         };
       });
-  } catch {
-    return [];
+    return { rows };
+  } catch (error) {
+    return { rows: [], error: `Coolify is unreachable from this host: ${String(error)}` };
   }
 }
 
@@ -205,15 +214,14 @@ export async function deploymentFeed(limit = 12): Promise<{
 }> {
   const local = groupDeployments(readDeployEvents());
   const remote = await coolifyDeployments();
-  const rows = [...local, ...remote]
+  const rows = [...local, ...remote.rows]
     .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
     .slice(0, limit);
-  return {
-    rows,
-    coolifyAvailable: remote.length > 0,
-    note:
-      remote.length === 0
-        ? "Coolify deployments are not visible from this host: set COOLIFY_TOKEN and COOLIFY_APP_UUID to include them."
-        : undefined,
-  };
+  const note =
+    remote.error === "not-configured"
+      ? "Coolify deployments are not visible from this host: set COOLIFY_TOKEN and COOLIFY_APP_UUID to include them."
+      : remote.error
+        ? `Coolify's deployments are missing from this list. ${remote.error}`
+        : undefined;
+  return { rows, coolifyAvailable: remote.rows.length > 0, note };
 }
