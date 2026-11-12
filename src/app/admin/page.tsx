@@ -17,10 +17,11 @@ import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui"
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
 import { BudgetForm, SiteProbeButton } from "@/components/BudgetControls";
 import { lastProbe, publicSiteUrl } from "@/lib/public-site/uptime";
+import { deploymentFeed } from "@/lib/domain/deployments";
 
 export const dynamic = "force-dynamic";
 
-export default function AdministrationPage() {
+export default async function AdministrationPage() {
   const session = tryGetSession();
   if (!session) return <SetupNotice />;
   const { company } = session;
@@ -36,6 +37,7 @@ export default function AdministrationPage() {
   const provider = getProviderHealth(company.id);
   const unknown = listTasks(company.id).filter((task) => task.status === "blocked");
   const siteProbe = lastProbe(company.id);
+  const feed = await deploymentFeed();
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -225,6 +227,47 @@ export default function AdministrationPage() {
       </div>
 
       <div className="grid two">
+        <Panel title="Deployments" hint={feed.rows.length ? `${feed.rows.length} recent` : "none yet"}>
+          {feed.rows.length === 0 ? (
+            <Empty>No deployment has been recorded yet.</Empty>
+          ) : (
+            <ul className="list">
+              {feed.rows.map((row) => (
+                <li key={`${row.source}-${row.commit}-${row.startedAt}`}>
+                  <span>
+                    <span className="mono tiny">{row.commit.slice(0, 7) || "unknown"}</span>
+                    <span className="tiny faint"> · {row.source}</span>
+                    <br />
+                    <span className="tiny faint">
+                      {row.finishedAt
+                        ? `${row.durationMs !== undefined ? `${Math.round(row.durationMs / 1000)}s` : "finished"} · ${relativeTime(row.finishedAt)}`
+                        : `started ${relativeTime(row.startedAt)}`}
+                    </span>
+                  </span>
+                  <Badge
+                    tone={
+                      row.status === "succeeded" || row.status === "finished"
+                        ? "ok"
+                        : row.status === "failed"
+                          ? "bad"
+                          : row.status === "running" || row.status === "in_progress"
+                            ? "info"
+                            : "warn"
+                    }
+                  >
+                    {row.status}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+          {feed.note ? (
+            <p className="tiny faint" style={{ marginTop: 10 }}>
+              {feed.note}
+            </p>
+          ) : null}
+        </Panel>
+
         <Panel title="Public site" hint="Watched, not assumed">
           <dl className="kv">
             <dt>URL</dt>

@@ -4,6 +4,11 @@
 # so what runs is exactly a commit — never a hand-copied file. A build failure
 # stops before the restart, leaving the previous build serving.
 #
+# Every deployment writes a start and a finish to $OPENCOMPANY_DATA_DIR/
+# deploy-events.jsonl, which the console reads, so nobody has to open a journal to
+# learn what went live and when. Set OPENCOMPANY_DEPLOY_NOTIFY_URL to also POST
+# those events somewhere (a chat relay, a monitor) as JSON.
+#
 # Usage: scripts/deploy.sh [branch]      (default: main, or $BRANCH)
 #
 set -euo pipefail
@@ -13,6 +18,25 @@ BRANCH="${1:-${BRANCH:-main}}"
 SERVICES="${SERVICES:-opencompany-web opencompany-worker}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 LOCK_FILE="${LOCK_FILE:-/run/opencompany-deploy.lock}"
+DATA_DIR="${OPENCOMPANY_DATA_DIR:-$APP_DIR/.data}"
+EVENTS="$DATA_DIR/deploy-events.jsonl"
+NOTIFY_URL="${OPENCOMPANY_DEPLOY_NOTIFY_URL:-}"
+
+# Emitting is best-effort: a deployment must not fail because a log line did.
+emit() {
+  local phase="$1" status="$2" detail="${3:-}"
+  mkdir -p "$DATA_DIR" 2>/dev/null || true
+  local commit
+  commit="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+  printf '{"at":"%s","source":"box","phase":"%s","status":"%s","commit":"%s","detail":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$phase" "$status" "$commit" "${detail//\"/\'}" \
+    >> "$EVENTS" 2>/dev/null || true
+  if [ -n "$NOTIFY_URL" ]; then
+    curl -fsS -m 5 -X POST -H "content-type: application/json" \
+      -d "{\"source\":\"box\",\"phase\":\"$phase\",\"status\":\"$status\",\"commit\":\"$commit\",\"detail\":\"${detail//\"/\'}\"}" \
+      "$NOTIFY_URL" >/dev/null 2>&1 || true
+  fi
+}
 
 deploy() {
   cd "$APP_DIR"
@@ -24,6 +48,8 @@ deploy() {
     before=""
   fi
 
+  trap 'rc=$?; emit finish failed "deploy failed (exit $rc)"; exit $rc' ERR
+
   echo "[deploy] fetching origin/$BRANCH"
   git fetch --prune origin
 
@@ -31,6 +57,7 @@ deploy() {
   if [ "$before" != "$target" ]; then
     echo "[deploy] $( [ -n "$before" ] && git rev-parse --short "$before" || echo "no checkout" ) -> $(git rev-parse --short "$target")"
     git reset --hard "origin/$BRANCH"
+    emit start started ""
   else
     echo "[deploy] already at $(git rev-parse --short HEAD)"
   fi
@@ -64,9 +91,12 @@ deploy() {
   if ! curl -fsS "$HEALTH_URL"; then
     echo
     echo "[deploy] health check failed at $HEALTH_URL" >&2
+    emit finish failed "health check failed"
     exit 1
   fi
 
+  trap - ERR
+  emit finish succeeded ""
   echo
   echo "[deploy] live at commit $(git rev-parse HEAD) — $(git log -1 --pretty=%s)"
 }

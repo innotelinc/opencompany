@@ -218,6 +218,13 @@ journalctl -u opencompany-autodeploy -n 50   # what it did, and when
 systemctl list-timers opencompany-autodeploy.timer
 ```
 
+Deployments report themselves. `scripts/deploy.sh` appends a start and a finish to
+`$OPENCOMPANY_DATA_DIR/deploy-events.jsonl` and POSTs the same JSON to
+`OPENCOMPANY_DEPLOY_NOTIFY_URL` when that is set, and Administration →
+Deployments also lists Coolify's own deployments through its API. A start with no
+finish is shown as running rather than hidden, and a failure keeps the reason.
+`/api/deployments` returns the same feed for a monitor; no journal reading.
+
 The Coolify instance deploys on the same push through a GitHub webhook, because
 the webhook runs in the other direction: Coolify is reachable at
 `deploy.innotel.us`, so GitHub calls it. The hook points at
