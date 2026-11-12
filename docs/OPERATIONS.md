@@ -199,6 +199,25 @@ resolves on the LAN: from the internet the box's public IP is fronted by a
 gateway that serves `deploy.innotel.us` alone, so publishing under a real
 hostname needs a DNS record and a matching route on that gateway.
 
+### Auto-deploy on push
+
+`bash deploy/install-auto-deploy.sh` (once, as root) installs
+`/usr/local/bin/opencompany-autodeploy` and a systemd timer that runs it every
+minute: it fetches `origin/main`, and when the branch has moved it runs
+`scripts/deploy.sh`, which builds, restarts web and worker, and waits for
+`/api/health`. A push is live within about a minute.
+
+The box has a read-only GitHub deploy key and no inbound access, so it polls
+rather than receiving a webhook. Nothing is fetched or built when the branch has
+not moved. `scripts/deploy.sh` holds `/run/opencompany-deploy.lock`, so a manual
+deploy and the timer cannot build over each other. The watcher refuses to reset a
+checkout with modified tracked files, leaving that decision to a human.
+
+```sh
+journalctl -u opencompany-autodeploy -n 50   # what it did, and when
+systemctl list-timers opencompany-autodeploy.timer
+```
+
 ### The public site
 
 The company's own site is React (`src/lib/public-site/site.tsx`), rendered to
