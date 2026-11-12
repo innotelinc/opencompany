@@ -7,6 +7,8 @@ export interface BudgetSnapshot {
   verifiedCents: number;
   committedCents: number;
   limitCents: number;
+  /** A limit of 0 means the owner removed the ceiling; spending is still metered. */
+  unlimited: boolean;
   remainingCents: number;
   modelTokensIn: number;
   modelTokensOut: number;
@@ -25,7 +27,8 @@ export function budgetSnapshot(companyId: string, policies: Record<string, unkno
     verifiedCents: totals.verifiedCents,
     committedCents,
     limitCents,
-    remainingCents: Math.max(0, limitCents - committedCents),
+    unlimited: limitCents <= 0,
+    remainingCents: limitCents <= 0 ? 0 : Math.max(0, limitCents - committedCents),
     modelTokensIn: totals.modelTokensIn,
     modelTokensOut: totals.modelTokensOut,
   };
@@ -47,7 +50,7 @@ export function canDispatch(
   const snapshot = budgetSnapshot(companyId, policies);
   const projected = snapshot.committedCents + estimateCents;
   const warning =
-    projected > snapshot.limitCents
+    !snapshot.unlimited && projected > snapshot.limitCents
       ? `Virtual budget ${projected}¢ is past the ${snapshot.limitCents}¢ figure; nothing was charged and work continues.`
       : undefined;
   return { ok: true, warning, snapshot };

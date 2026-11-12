@@ -1,6 +1,7 @@
 import { describeError } from "@/lib/errors";
 import type { AgentBackend, AgentRunInput, AgentRunResult } from "@/lib/engine/types";
 import { ALL_CHECKS } from "@/lib/engine/checks";
+import { renderPublicSite } from "@/lib/public-site/site";
 import type { CheckResult } from "@/lib/domain/types";
 
 /**
@@ -400,109 +401,10 @@ Open \`index.html\` locally, or use the Preview panel in OpenCompany.
  * claims that the company cannot support.
  */
 function publicSiteFiles(brief: BriefFacts): Record<string, string> {
-  // The public site is the company's own face, not a customer project. Keep the
-  // brief's palette and address, but brand every page as OpenCompany.
-  const facts: BriefFacts = { ...brief, customer: "OpenCompany" };
-  const home = shell({
-    facts,
-    active: "home",
-    title: `${facts.customer} — AI employees, owner authority`,
-    description: `An AI company operating system: AI employees plan, build, check and review work while the owner holds budget, approvals and the stop button.`,
-    body: `    <section class="hero">
-      <div>
-        <p class="eyebrow">AI company operating system</p>
-        <h1>AI employees do the work. You keep the authority.</h1>
-        <p>${esc(facts.customer)} runs goals end to end — plan, build, automated checks and an independent review — and stops at your desk for anything external.</p>
-        <a class="button" href="about.html">How it works</a>
-      </div>
-      <div class="card">
-        <h2>What you approve</h2>
-        <p>Plans, budgets and every external action. Publishing, email and spend above your threshold wait for an explicit owner decision bound to the exact action.</p>
-      </div>
-    </section>
-
-    <section>
-      <p class="eyebrow">The loop</p>
-      <h2>One operating loop, no hidden steps</h2>
-      <div class="grid">
-        <article class="card"><h3>1. Direction</h3><p>You state the goal and the budget. Requirements are stored as company knowledge before any work starts.</p></article>
-        <article class="card"><h3>2. Plan</h3><p>The CEO proposes a small project with owners, acceptance criteria and checks. Nothing runs until you approve it.</p></article>
-        <article class="card"><h3>3. Work</h3><p>Employees build in isolated workspaces. Automated checks run on the produced files, not on a claim of success.</p></article>
-        <article class="card"><h3>4. Review</h3><p>A different employee reviews the artifact. Failures come back as bounded revisions; passing work reaches your report.</p></article>
-      </div>
-    </section>`,
-  });
-
-  const about = shell({
-    facts,
-    active: "about",
-    title: `How ${facts.customer} works`,
-    description: `The architecture and guarantees behind ${facts.customer}: durable workers, server-enforced authority and reviewed deliverables.`,
-    body: `    <section>
-      <p class="eyebrow">How it works</p>
-      <h1>Durable by default</h1>
-      <p>Work runs in a separate durable worker with leases, cancellation and recovery. Restarting the app does not lose the queue, and an interrupted run is retried exactly once rather than resumed mid-flight.</p>
-    </section>
-    <section>
-      <h2>Rules the software enforces</h2>
-      <div class="grid">
-        <article class="card"><h3>Authority</h3><p>Every action is checked server-side against company policy, the employee's authority and remaining budget.</p></article>
-        <article class="card"><h3>Approvals</h3><p>An approval is bound to a SHA-256 of the proposed action. If the details change, the approval no longer applies.</p></article>
-        <article class="card"><h3>Evidence</h3><p>A task is complete only with a stored deliverable, passing checks and an independent review.</p></article>
-        <article class="card"><h3>Stop</h3><p>An emergency stop halts new work immediately. The owner can also take over an employee's computer.</p></article>
-      </div>
-    </section>
-
-    <section>
-      <p class="eyebrow">Principles</p>
-      <h2>What we refuse to do</h2>
-      <p>No invented customers, invoices or metrics. No silent external actions. No “done” without an artifact and a review. Provider charges appear only when a provider reports them.</p>
-      <a class="button secondary" href="contact.html">Talk to the owner</a>
-    </section>`,
-  });
-
-  const contact = shell({
-    facts,
-    active: "contact",
-    title: `Contact ${facts.customer}`,
-    description: `Questions about ${facts.customer}, the operating model or a deployment.`,
-    body: `    <section>
-      <p class="eyebrow">Contact</p>
-      <h1>Questions about the company</h1>
-      <p>This site is maintained by ${esc("the public site developer")} and reviewed by the owner. It runs on static files with no trackers.</p>
-      <form class="contact-form" action="mailto:${esc(facts.contactEmail)}" method="post" enctype="text/plain">
-        <label for="name">Your name</label>
-        <input id="name" name="name" type="text" autocomplete="name" required>
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="email" required>
-        <label for="message">What would you like to know?</label>
-        <textarea id="message" name="message" rows="5" required></textarea>
-        <button type="submit">Send</button>
-      </form>
-      <p>Or email <a href="mailto:${esc(facts.contactEmail)}">${esc(facts.contactEmail)}</a>. The form opens your mail client; there is no server-side inbox.</p>
-    </section>`,
-  });
-
-  const readme = `# ${facts.customer} public site
-
-Maintained by the public site developer from the \`${"Public site brief"}\` knowledge document.
-Served by the application at \`/site\`; not deployed externally.
-
-## Files
-
-- \`index.html\` — positioning and the operating loop
-- \`about.html\` — architecture, guarantees and principles
-- \`contact.html\` — enquiry form (mail client, no backend)
-- \`styles.css\` — one stylesheet, responsive, no external assets
-`;
-
-  return {
-    "index.html": home,
-    "about.html": about,
-    "contact.html": contact,
-    "styles.css": stylesheet(facts),
-    "README.md": readme,
-  };
+  // The company's own site is React-authored (src/lib/public-site/site.tsx) and
+  // rendered to static files; only the brand facts come from the brief, so an
+  // improvement pass cannot drift away from the owner's stated brand.
+  return renderPublicSite({ ...brief, customer: "OpenCompany" });
 }
 
 export class DeterministicBackend implements AgentBackend {

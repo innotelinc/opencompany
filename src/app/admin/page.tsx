@@ -15,6 +15,8 @@ import { getProviderHealth } from "@/lib/domain/provider";
 import { ALL_CHECKS, checkDescription } from "@/lib/engine/checks";
 import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
+import { BudgetForm, SiteProbeButton } from "@/components/BudgetControls";
+import { lastProbe, publicSiteUrl } from "@/lib/public-site/uptime";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ export default function AdministrationPage() {
   const worker = workerStatus();
   const provider = getProviderHealth(company.id);
   const unknown = listTasks(company.id).filter((task) => task.status === "blocked");
+  const siteProbe = lastProbe(company.id);
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -111,8 +114,12 @@ export default function AdministrationPage() {
         </Panel>
 
         <Panel title="Budgets and usage" hint="Estimates are not invoices">
+          <BudgetForm
+            limitCents={budget.limitCents}
+            autoApproveCents={Number(policies["budget.auto_approve_cents"] ?? config.limits.autoApproveCents)}
+          />
           <div className="grid three" style={{ marginBottom: 12 }}>
-            <div className="metric"><span className="label">Limit</span><span className="value">{(budget.limitCents / 100).toFixed(2)}</span><span className="hint">USD / month</span></div>
+            <div className="metric"><span className="label">Limit</span><span className="value">{budget.unlimited ? "none" : (budget.limitCents / 100).toFixed(2)}</span><span className="hint">{budget.unlimited ? "no ceiling · still metered" : "USD / month"}</span></div>
             <div className="metric"><span className="label">Committed</span><span className="value">{(budget.committedCents / 100).toFixed(2)}</span><span className="hint">estimates + usage</span></div>
             <div className="metric"><span className="label">Tokens</span><span className="value">{budget.modelTokensIn + budget.modelTokensOut}</span><span className="hint">recorded</span></div>
           </div>
@@ -218,6 +225,28 @@ export default function AdministrationPage() {
       </div>
 
       <div className="grid two">
+        <Panel title="Public site" hint="Watched, not assumed">
+          <dl className="kv">
+            <dt>URL</dt>
+            <dd className="mono tiny" style={{ wordBreak: "break-word" }}>{publicSiteUrl()}</dd>
+            <dt>Last probe</dt>
+            <dd>
+              {siteProbe
+                ? `${siteProbe.ok ? "reachable" : "not answering"} · ${relativeTime(siteProbe.checkedAt)}`
+                : "never checked"}
+            </dd>
+            <dt>Detail</dt>
+            <dd className="tiny faint">{siteProbe?.detail ?? "—"}</dd>
+          </dl>
+          <div className="row" style={{ marginTop: 10 }}>
+            <SiteProbeButton />
+          </div>
+          <p className="tiny faint" style={{ marginTop: 10 }}>
+            The site serves the newest version that passed its checks, so a failed improvement cannot take it offline.
+            The availability check runs on a routine every fifteen minutes and reports instead of guessing.
+          </p>
+        </Panel>
+
         <Panel title="Operating reports" hint={`${reports.length}`}>
           {reports.length === 0 ? <Empty>No reports yet.</Empty> : (
             <ul className="list">

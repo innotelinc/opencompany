@@ -23,6 +23,7 @@ import {
 } from "../src/lib/domain/repo";
 
 export const PUBLIC_SITE_ROUTINE = "Public site: improvement pass";
+export const PUBLIC_SITE_WATCH_ROUTINE = "Public site: availability watch";
 export const PUBLIC_SITE_BRIEF = "Public site brief";
 export const PUBLIC_SITE_EMPLOYEE = "Nova Reyes";
 
@@ -36,6 +37,7 @@ const PUBLIC_SITE_KNOWLEDGE = [
   "Accent color: #d8a24a",
   "Notes: Owners set direction, budget and approvals; AI employees plan, build, check and review the work. Nothing external happens without the owner.",
   "Constraints: static files only; no trackers or external assets; the contact form must not claim a backend.",
+  "Availability: this site is the company's public face and must answer 24/7. Keep the last passing version online; never let an improvement pass take the site down.",
 ].join("\n");
 
 export function ensurePublicSiteFoundation(companyId: string, config: AppConfig = getConfig()): string[] {
@@ -54,7 +56,7 @@ export function ensurePublicSiteFoundation(companyId: string, config: AppConfig 
       name: PUBLIC_SITE_EMPLOYEE,
       title: "Public Site Developer",
       roleInstructions:
-        "Own the company's public website. Keep it accurate, fast and accessible. Improve one meaningful thing per pass; never invent customers, prices or claims. Nothing is published externally without the owner.",
+        "Own the company's public website and keep it online 24/7. Keep it accurate, fast and accessible. Improve one meaningful thing per pass and watch availability on a routine; never invent customers, prices or claims. Nothing is published externally without the owner.",
       backend: "deterministic",
       model: config.model,
       allowedTools: ["files.read", "files.write", "terminal.exec", "knowledge.read", "browser.session"],
@@ -97,6 +99,25 @@ export function ensurePublicSiteFoundation(companyId: string, config: AppConfig 
       nextRunAt: new Date(Date.now() + 60_000).toISOString(),
     });
     added.push(`routine ${PUBLIC_SITE_ROUTINE}`);
+  }
+
+  // Availability is its own duty. The improvement loop ships changes; this loop
+  // is the one that notices the site stopped answering and raises it.
+  if (!listRoutines(companyId).some((routine) => routine.name === PUBLIC_SITE_WATCH_ROUTINE)) {
+    createRoutine({
+      companyId,
+      name: PUBLIC_SITE_WATCH_ROUTINE,
+      instructions: [
+        "Check that the public site answers: fetch the site URL and confirm a 200 with the real page, not the holding page.",
+        "Record what you saw — status, time and response — and say plainly when the site is down instead of reporting a healthy site you did not check.",
+        "If the site is down, open a fix in your own workspace and escalate to the owner; never publish or restart production without an owner decision.",
+        "Never invent uptime. A check you did not run is not a passing check.",
+      ].join("\n"),
+      assigneeId: developer.id,
+      intervalMinutes: 15,
+      nextRunAt: new Date(Date.now() + 30_000).toISOString(),
+    });
+    added.push(`routine ${PUBLIC_SITE_WATCH_ROUTINE}`);
   }
 
   return added;

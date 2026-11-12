@@ -82,6 +82,12 @@ test("real spending needs the owner; virtual budget never blocks", () => {
   const overrun = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 5 });
   assert.equal(overrun.ok, true);
   assert.match(overrun.warning ?? "", /Virtual budget/);
+
+  // The owner may remove the ceiling entirely; metering continues, overruns stop.
+  const uncapped = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 0 });
+  assert.equal(uncapped.ok, true);
+  assert.equal(uncapped.snapshot.unlimited, true);
+  assert.equal(uncapped.warning, undefined, "a removed ceiling must never report an overrun");
 });
 
 test("an owner decision binds to the exact action and changes invalidate it", () => {
