@@ -42,8 +42,11 @@ services:
       dockerfile: Dockerfile
     command: sh -c "npm run db:migrate && npm run db:seed && npm start"
     environment: *opencompany-environment
-    ports:
-      - "3000:3000"
+    # Published through Coolify's proxy (see the app's domain), not on a host
+    # port: the box already has something listening on 3000, and publishing it
+    # here makes `docker compose up` fail with "port is already allocated".
+    expose:
+      - "3000"
     volumes:
       - opencompany-data:/app/.data
     healthcheck:

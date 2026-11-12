@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { applicationUrl } from "../src/lib/engine/coolify";
 import { externalActionAdapter } from "../src/lib/engine/external";
 
 const KEYS = [
@@ -67,6 +68,20 @@ test("Vercel still works when explicitly selected", () => {
     assert.equal(configured.id, "vercel");
     assert.doesNotMatch(configured.note, /test-token-value/);
   });
+});
+
+test("a compose application's domain comes from its service map", () => {
+  assert.equal(
+    applicationUrl(null, '{"web":{"domain":"http://opencompany.73.68.203.71.sslip.io"}}'),
+    "http://opencompany.73.68.203.71.sslip.io",
+  );
+  assert.equal(
+    applicationUrl("https://plain.example"),
+    "https://plain.example",
+    "a plain application still reads fqdn",
+  );
+  assert.equal(applicationUrl(null, null), "");
+  assert.equal(applicationUrl(null, "not-json{"), "");
 });
 
 test("an unsupported deployment provider fails closed", () => {

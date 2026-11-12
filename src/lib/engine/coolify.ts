@@ -26,7 +26,8 @@ export type CoolifyPublishResult =
   | { ok: false; reason: string };
 
 const POLL_INTERVAL_MS = 5_000;
-const POLL_DEADLINE_MS = 180_000;
+/** A first deployment pulls base images and compiles: three minutes was not enough. */
+const POLL_DEADLINE_MS = 20 * 60_000;
 const TERMINAL_STATES = new Set(["finished", "failed", "cancelled", "cancelled-with-warnings"]);
 
 async function call(
@@ -49,12 +50,38 @@ async function call(
 }
 
 /** Coolify lists several domains as a comma-separated fqdn string. */
-function publicUrl(fqdn: unknown): string {
-  const first = String(fqdn ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith("http"));
-  return first ?? "";
+function splitDomains(value: unknown): string[] {
+  if (!value) return [];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return splitDomains(JSON.parse(trimmed) as unknown);
+      } catch {
+        return [];
+      }
+    }
+    return trimmed.split(",").map((entry) => entry.trim());
+  }
+  if (Array.isArray(value)) return value.flatMap(splitDomains);
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).flatMap((service) =>
+      service && typeof service === "object"
+        ? splitDomains((service as { domain?: unknown }).domain)
+        : splitDomains(service),
+    );
+  }
+  return [];
+}
+
+/**
+ * A plain application keeps its domains in `fqdn`; a Docker Compose application
+ * keeps them per service in `docker_compose_domains`. Reading only `fqdn` makes
+ * every compose deployment look domainless.
+ */
+export function applicationUrl(fqdn: unknown, composeDomains?: unknown): string {
+  const candidates = [...splitDomains(fqdn), ...splitDomains(composeDomains)];
+  return candidates.find((entry) => entry.startsWith("http")) ?? "";
 }
 
 export async function publishToCoolify(
@@ -116,8 +143,12 @@ export async function publishToCoolify(
   try {
     const app = await call(provider, `/applications/${encodeURIComponent(provider.appUuid)}`, {}, 15_000);
     if (app.ok) {
-      const body = JSON.parse(app.body) as { fqdn?: string; status?: string };
-      url = publicUrl(body.fqdn);
+      const body = JSON.parse(app.body) as {
+        fqdn?: string;
+        status?: string;
+        docker_compose_domains?: string | null;
+      };
+      url = applicationUrl(body.fqdn, body.docker_compose_domains);
       if (body.status) state = body.status;
     }
   } catch {
