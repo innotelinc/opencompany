@@ -199,6 +199,25 @@ resolves on the LAN: from the internet the box's public IP is fronted by a
 gateway that serves `deploy.innotel.us` alone, so publishing under a real
 hostname needs a DNS record and a matching route on that gateway.
 
+### The public site
+
+The company's own site is React (`src/lib/public-site/site.tsx`), rendered to
+static files with `renderToStaticMarkup` and served at `/site`. It is not
+hydrated: plain HTML and CSS, which keeps a strict content-security policy
+workable.
+
+Two duties keep it online. `Public site: improvement pass` (hourly) rebuilds the
+site and only a version that passed its checks is served; `Public site:
+availability watch` (every fifteen minutes) asks `/api/public-site/health`
+whether the site answers and reports what it saw. `OPENCOMPANY_PUBLIC_SITE_URL`
+is what both check, defaulting to this app's own `/site`.
+
+Employee browsers are on by default (`OPENCOMPANY_BROWSER_ENABLED=1`) and the
+image installs Playwright's Chromium, so "Browser: not configured" cannot come
+back after a redeploy. The owner edits the budget in Administration; a ceiling of
+0 means no ceiling, which silences overrun warnings but not the approval in front
+of real money.
+
 Two things bite when wiring this up. The token is a Sanctum token presented as
 `<row id>|<secret>`, so it must keep its `id|` prefix. And Coolify answers API
 calls only from addresses in its `allowed_ips` setting: put the worker's address
