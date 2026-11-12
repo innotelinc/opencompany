@@ -190,6 +190,15 @@ COOLIFY_APP_UUID=...   # the application's uuid, not its name
 OPENCOMPANY_DEPLOY_NAME=opencompany-site
 ```
 
+The OpenCompany application on that instance is a Docker Compose resource built
+from `docker-compose.coolify.yaml`, and it is published at
+`http://opencompany.73.68.203.71.sslip.io` through Coolify's proxy. Coolify
+keeps a compose application's domains per service in `docker_compose_domains`,
+not in `fqdn`, so set them on the application's `web` service. That name only
+resolves on the LAN: from the internet the box's public IP is fronted by a
+gateway that serves `deploy.innotel.us` alone, so publishing under a real
+hostname needs a DNS record and a matching route on that gateway.
+
 Two things bite when wiring this up. The token is a Sanctum token presented as
 `<row id>|<secret>`, so it must keep its `id|` prefix. And Coolify answers API
 calls only from addresses in its `allowed_ips` setting: put the worker's address
