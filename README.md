@@ -120,6 +120,7 @@ Licensing and upstream attribution: [docs/LICENSING.md](docs/LICENSING.md).
 | `npm run db:reset` | Clear company data and reseed |
 | `npm run db:migrate` | Apply SQL migrations |
 | `npm run demo` | Deterministic end-to-end slice |
+| `npm run site:publish` | Publish `src/lib/public-site/site.tsx` to `/site` after its checks pass |
 | `npm test` | Policy, recovery, isolation and full-slice tests |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run build` | Production Next.js build |
