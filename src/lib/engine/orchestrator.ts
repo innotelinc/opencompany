@@ -12,6 +12,7 @@ import {
   getComputerForEmployee,
   getDeliverableByName,
   getDeliverableForTask,
+  getDeliverableForReviewedTask,
   getEmployee,
   getGoal,
   getPolicies,
@@ -602,7 +603,7 @@ export async function executeClaimedRun(input: {
 
     const upstream = task.reviewOfTaskId
       ? (() => {
-          const reviewed = getDeliverableForTask(companyId, task.reviewOfTaskId);
+          const reviewed = getDeliverableForReviewedTask(companyId, task.reviewOfTaskId);
           return reviewed ? latestDeliverableVersion(companyId, reviewed.id) : null;
         })()
       : /public site/i.test(task.title)
@@ -1198,7 +1199,8 @@ function handleReview(input: {
   // task-scoped lookup and asking for another review on every retry.
   const deliverable =
     getDeliverableForTask(companyId, reviewed.id) ??
-    (/^Public site\b/i.test(reviewed.title) ? getDeliverableByName(companyId, PUBLIC_SITE_DELIVERABLE_NAME) : null);
+    (/^Public site\b/i.test(reviewed.title) ? getDeliverableByName(companyId, PUBLIC_SITE_DELIVERABLE_NAME) : null) ??
+    getDeliverableForReviewedTask(companyId, reviewed.id);
   const version = deliverable ? latestDeliverableVersion(companyId, deliverable.id) : null;
   if (!deliverable || !version) {
     // Nothing to inspect is a dead end, not a transient error: retrying only

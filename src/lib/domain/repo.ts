@@ -1024,6 +1024,30 @@ export function getDeliverableForTask(companyId: string, taskId: string): Delive
   return r ? mapDeliverable(r) : null;
 }
 
+/**
+ * Resolve the deliverable a review should inspect.
+ *
+ * The canonical public-site deliverable is re-pointed at whichever pass last
+ * produced a version, so deliverables.task_id drifts away from the task whose
+ * version is under review, and a rename of the canonical deliverable (an
+ * install seeded before the current name) leaves the by-name lookup empty too.
+ * Fall back to the version's own run, which is immutable.
+ */
+export function getDeliverableForReviewedTask(companyId: string, taskId: string): Deliverable | null {
+  const direct = getDeliverableForTask(companyId, taskId);
+  if (direct) return direct;
+  const r = getDb()
+    .prepare(
+      `SELECT d.* FROM deliverables d
+         JOIN deliverable_versions v ON v.deliverable_id = d.id AND v.company_id = d.company_id
+         JOIN task_runs r ON r.id = v.run_id AND r.company_id = d.company_id
+        WHERE d.company_id = ? AND r.task_id = ?
+        ORDER BY v.created_at DESC LIMIT 1`,
+    )
+    .get(companyId, taskId);
+  return r ? mapDeliverable(r) : null;
+}
+
 export function listDeliverables(companyId: string): Deliverable[] {
   return getDb()
     .prepare("SELECT * FROM deliverables WHERE company_id = ? ORDER BY created_at DESC")
