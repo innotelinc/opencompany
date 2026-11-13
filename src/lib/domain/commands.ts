@@ -13,12 +13,14 @@ import {
   listChildTasks,
   listDecisions,
   listEmployees,
+  listTasks,
   recordActivity,
   releaseHumanControl,
   requestRunCancellation,
   setCompanyHalted,
   setEmployeePaused,
   setEmployeeStatus,
+  terminateEmployeeRecord,
   updateDecision,
   updateKnowledgeDoc,
   updateTask,
@@ -244,6 +246,70 @@ export function pauseEmployee(input: { companyId: string; employeeId: string; ac
     type: input.paused ? "employee.paused" : "employee.resumed",
     summary: `Owner ${input.paused ? "paused" : "resumed"} ${employee.name}.`,
   });
+}
+
+/**
+ * Fire an employee through the portal.
+ *
+ * This is a soft delete on purpose: the person comes off the roster immediately,
+ * their in-flight work is cancelled and their pending decisions are invalidated,
+ * but every task, run and ledger row keeps pointing at a real record, so the
+ * audit trail and the money history stay intact.
+ */
+export function terminateEmployee(input: {
+  companyId: string;
+  employeeId: string;
+  actorId: string;
+  reason?: string;
+}): { cancelledTasks: number; invalidatedDecisions: number } {
+  const employee = getEmployee(input.companyId, input.employeeId);
+  if (!employee) throw new Error("Employee not found in this company.");
+  if (employee.terminatedAt) throw new Error(`${employee.name} has already left the company.`);
+  if (/chief executive/i.test(employee.title)) {
+    throw new Error("Hire or promote another CEO before firing this one — the company needs a planner.");
+  }
+
+  const openStatuses = ["pending", "running", "blocked", "awaiting_review", "awaiting_approval"];
+  const owned = listTasks(input.companyId).filter(
+    (task) => task.assigneeId === employee.id && openStatuses.includes(task.status),
+  );
+  getDb()
+    .prepare(
+      "UPDATE task_runs SET cancel_requested = 1 WHERE company_id = ? AND employee_id = ? AND status IN ('queued','running')",
+    )
+    .run(input.companyId, employee.id);
+  for (const task of owned) {
+    updateTask(input.companyId, task.id, {
+      status: "cancelled",
+      cancelRequested: true,
+      blockedReason: `${employee.name} left the company.`,
+    });
+  }
+
+  let invalidatedDecisions = 0;
+  for (const decision of listDecisions(input.companyId, "pending")) {
+    if (decision.requestedByEmployeeId !== employee.id) continue;
+    updateDecision(input.companyId, decision.id, {
+      status: "invalidated",
+      invalidatedReason: `${employee.name} left the company before this was decided.`,
+      decidedBy: input.actorId,
+    });
+    invalidatedDecisions += 1;
+  }
+
+  releaseHumanControl(input.companyId, employee.id);
+  terminateEmployeeRecord(input.companyId, employee.id, input.reason?.trim() || "Left the company.");
+
+  recordActivity({
+    companyId: input.companyId,
+    actorType: "human",
+    actorId: input.actorId,
+    type: "employee.terminated",
+    summary: `Owner fired ${employee.name} (${employee.title}). ${owned.length} open task(s) cancelled, ${invalidatedDecisions} decision(s) invalidated.`,
+    payload: { employeeId: employee.id, reason: input.reason ?? null, tasks: owned.map((task) => task.id) },
+  });
+
+  return { cancelledTasks: owned.length, invalidatedDecisions };
 }
 
 export function takeOverComputer(input: { companyId: string; employeeId: string; actorId: string }): void {

@@ -5,7 +5,7 @@ import { tryGetSession } from "@/lib/session";
 import { getConfig, liveModelConfigured } from "@/lib/config";
 import { listDecisions } from "@/lib/domain/repo";
 import { workerStatus } from "@/lib/domain/ops";
-import LiveRefresh from "@/components/LiveRefresh";
+import LiveStrip from "@/components/LiveStrip";
 import { NavLink } from "@/components/NavLink";
 
 export const metadata: Metadata = {
@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </aside>
           <main className="main">
-            {session ? <LiveRefresh seconds={5} /> : null}
+            {session ? <LiveStrip /> : null}
             {children}
           </main>
         </div>

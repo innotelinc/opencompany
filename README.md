@@ -178,9 +178,10 @@ Licensing and upstream attribution: [docs/LICENSING.md](docs/LICENSING.md).
 **http://192.168.1.112:3000** under systemd (`deploy/*.service`, install notes in
 `docs/OPERATIONS.md`). `Dockerfile` and `docker-compose.yml` run the web app and
 worker against a shared `.data` volume. Before exposing this beyond a
-trusted machine: add real authentication, put the worker in a container, set
-`OPENCOMPANY_MONTHLY_BUDGET_CENTS`, and configure a secret store for provider
-credentials. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
+trusted machine: add real authentication, put the worker in a container, set a
+monthly planning figure, and configure a secret store for provider credentials.
+The figure reports spending; it never gates work. See
+[docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Deploying
 
@@ -225,6 +226,39 @@ the independent review. Token usage per run is recorded in `task_runs`.
 recurring `Public site: improvement pass` routine, so the company website is always
 being worked on. The latest check-passing version is served read-only at `/site`
 with no owner session; until one exists the route returns a "being built" page.
+
+## Staff, machines and live state
+
+The Organization page is the staff desk: hire, assign a task directly to one
+employee, pause, or fire. Firing is a soft delete — open work is cancelled and the
+person leaves the roster, while their tasks, files and ledger rows stay for the
+record. Every employee has a computer page that shows its workspace files, its
+tool log and its runs while it works.
+
+Each computer has an autonomy mode the owner sets and can revoke:
+
+| Mode | Commands | Where they run |
+|---|---|---|
+| `guarded` (default) | allowlisted | the employee's workspace |
+| `yolo` | any command | the employee's workspace |
+| `host_control` | any command | the host root |
+
+The mode is read from company policy by the server on every command, written to
+the audit trail with the owner's reason, and cannot be widened by an employee. In
+`host_control` the application's own provider keys are still withheld from the
+child process.
+
+A live strip sits at the top of every page: worker heartbeat, who is working, what
+just happened, and whether the emergency stop is on. It polls `/api/live`, so it
+keeps telling the truth when a stream would be blocked by a proxy.
+
+## Spending as history
+
+The budget is a planning figure. The owner can set it or remove it, and nothing in
+dispatch consults it: no task is stopped, throttled or warned about by it. What is
+recorded — estimates, token usage and any provider-reported charge — is reported on
+Administration → Spending as daily bars, categories and totals. Paying an external
+party is still an owner approval at any amount.
 
 ## Automated browsers
 

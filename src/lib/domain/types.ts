@@ -73,6 +73,9 @@ export interface Employee {
   allowedTools: string[];
   authority: EmployeeAuthority;
   spendLimitCents: number;
+  /** Set when the owner fired this employee; the record and its history remain. */
+  terminatedAt: string | null;
+  terminationReason: string | null;
   createdAt: string;
   updatedAt: string;
 }

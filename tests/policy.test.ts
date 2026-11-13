@@ -78,16 +78,18 @@ test("real spending needs the owner; virtual budget never blocks", () => {
   assert.equal(overLimit.outcome, "require_approval", "paying money is the owner's call at any limit");
   assert.match(overLimit.reason, /real money/);
 
-  // Ledger cents are bookkeeping, not a charge: crossing the figure warns and work continues.
-  const overrun = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 5 });
-  assert.equal(overrun.ok, true);
-  assert.match(overrun.warning ?? "", /Virtual budget/);
+  // Ledger cents are history, not a charge: the figure is reported, never enforced.
+  const past = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 5 });
+  assert.equal(past.ok, true);
+  assert.deepEqual(past, { ok: true, snapshot: past.snapshot }, "a set figure must not add a warning or a block");
+  assert.equal(past.snapshot.limitCents, 5);
+  assert.equal(past.snapshot.unlimited, false);
 
-  // The owner may remove the ceiling entirely; metering continues, overruns stop.
-  const uncapped = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 0 });
-  assert.equal(uncapped.ok, true);
-  assert.equal(uncapped.snapshot.unlimited, true);
-  assert.equal(uncapped.warning, undefined, "a removed ceiling must never report an overrun");
+  // The owner may remove the figure entirely; history keeps being recorded.
+  const removed = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 0 });
+  assert.equal(removed.ok, true);
+  assert.equal(removed.snapshot.unlimited, true);
+  assert.equal(removed.snapshot.remainingCents, 0);
 });
 
 test("an owner decision binds to the exact action and changes invalidate it", () => {

@@ -1,9 +1,11 @@
 import fs from "node:fs";
+import Link from "next/link";
 import { tryGetSession } from "@/lib/session";
-import { listActivity, listComputers, listEmployees } from "@/lib/domain/repo";
+import { humanHoldsControl, listActivity, listComputers, listEmployees } from "@/lib/domain/repo";
 import { browserAvailability } from "@/lib/computers/browser";
+import { getComputerAutonomy } from "@/lib/computers/autonomy";
 import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
-import { ActionButton } from "@/components/OwnerConsole";
+import { AutonomyControl } from "@/components/StaffConsole";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +37,10 @@ export default function ComputersPage() {
       <header className="page-head">
         <div>
           <p className="eyebrow">Computers</p>
-          <h1>Employee workspaces</h1>
+          <h1>Machines</h1>
           <p>
-            Each employee has a persistent workspace directory and a restricted process runner. Taking control blocks
-            the agent before its next action; the lock expires on its own after 15 minutes.
+            Each employee has a persistent workspace and a command runner. Open a machine to watch files land, read the
+            tool log, and decide how much freedom it gets. Taking control blocks the agent before its next action.
           </p>
         </div>
         <Badge tone={browser.available ? "ok" : "sim"}>
@@ -49,7 +51,7 @@ export default function ComputersPage() {
       <div className="banner info">
         <span>
           Isolation boundary: workspaces are directories and commands run as the application user, not inside a VM.
-          Run the worker in a container before letting untrusted agents execute code.{" "}
+          Guarded is the default; YOLO and host control are owner grants recorded in the audit trail.{" "}
           <span className="faint">{browser.reason}</span>
         </span>
       </div>
@@ -59,7 +61,8 @@ export default function ComputersPage() {
           const computer = computers.find((candidate) => candidate.employeeId === employee.id);
           const files = computer ? countFiles(computer.workspacePath) : 0;
           const last = activity.find((event) => event.actorId === employee.id);
-          const locked = computer?.humanLockUntil ? Date.parse(computer.humanLockUntil) > Date.now() : false;
+          const locked = humanHoldsControl(computer ?? null);
+          const autonomy = getComputerAutonomy(company.id, employee.id);
           return (
             <Panel key={employee.id}>
               <div className="spread">
@@ -68,49 +71,40 @@ export default function ComputersPage() {
                     <span className={`dot ${employee.status}`} />
                     <h2 style={{ margin: 0, fontSize: 17 }}>{employee.name}</h2>
                     <Badge tone={employee.status === "working" ? "warn" : "default"}>{employee.status}</Badge>
+                    {locked ? <Badge tone="info">owner in control</Badge> : null}
                   </div>
-                  <p className="small muted" style={{ margin: "4px 0 0" }}>{employee.title}</p>
+                  <p className="small muted" style={{ margin: "4px 0 0" }}>
+                    {employee.title} · {files} file(s)
+                  </p>
                 </div>
-                <div className="row" style={{ gap: 6 }}>
-                  {locked ? (
-                    <ActionButton
-                      endpoint={`/api/computers/${employee.id}`}
-                      body={{ action: "release" }}
-                      label="Release control"
-                      tone="btn primary small"
-                    />
-                  ) : (
-                    <ActionButton
-                      endpoint={`/api/computers/${employee.id}`}
-                      body={{ action: "takeover" }}
-                      label="Take control"
-                      tone="btn small"
-                      confirmText="Pause this employee's agent and take control of its computer?"
-                    />
-                  )}
-                </div>
+                <Link className="btn small" href={`/computers/${employee.id}`}>
+                  Open machine
+                </Link>
               </div>
 
-              <dl className="kv" style={{ marginTop: 12 }}>
+              <dl className="kv tight" style={{ marginTop: 12 }}>
                 <dt>Computer</dt>
-                <dd>{computer?.status ?? "missing"} {locked ? <Badge tone="info">owner in control</Badge> : null}</dd>
+                <dd>{computer?.status ?? "missing"}</dd>
                 <dt>Workspace</dt>
-                <dd className="mono tiny">{computer?.workspacePath ?? "—"}</dd>
-                <dt>Files</dt>
-                <dd>{files} file(s)</dd>
+                <dd className="mono tiny" style={{ wordBreak: "break-all" }}>{computer?.workspacePath ?? "—"}</dd>
                 <dt>Browser</dt>
                 <dd>{browser.available ? computer?.browserStatus ?? "available" : "not configured"}</dd>
                 <dt>Last activity</dt>
                 <dd>{last ? `${last.summary} · ${relativeTime(last.createdAt)}` : "none"}</dd>
-                <dt>Tools</dt>
-                <dd className="mono tiny">{employee.allowedTools.join(", ")}</dd>
               </dl>
+
+              <div className="hr" />
+              <AutonomyControl employeeId={employee.id} employeeName={employee.name} mode={autonomy.mode} compact />
             </Panel>
           );
         })}
       </div>
 
-      {employees.length === 0 ? <Panel><Empty>No employees configured.</Empty></Panel> : null}
+      {employees.length === 0 ? (
+        <Panel>
+          <Empty>No employees configured.</Empty>
+        </Panel>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/session";
-import { pauseEmployee } from "@/lib/domain/commands";
+import { pauseEmployee, terminateEmployee } from "@/lib/domain/commands";
 import { getEmployee } from "@/lib/domain/repo";
 import { fail, ok, readJson, unexpected } from "@/lib/api";
 
@@ -10,9 +10,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const session = getSession();
     const { id } = await context.params;
-    const body = await readJson<{ action?: "pause" | "resume" }>(request);
+    const body = await readJson<{ action?: "pause" | "resume" | "fire"; reason?: string }>(request);
     const employee = getEmployee(session.company.id, id);
     if (!employee) return fail("Employee not found in this company.", 404);
+    if (body.action === "fire") {
+      const result = terminateEmployee({
+        companyId: session.company.id,
+        employeeId: id,
+        actorId: session.owner.id,
+        reason: body.reason,
+      });
+      return ok(result);
+    }
     if (body.action !== "pause" && body.action !== "resume") return fail("Unknown employee action.");
     pauseEmployee({
       companyId: session.company.id,

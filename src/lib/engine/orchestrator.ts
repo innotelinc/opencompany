@@ -422,20 +422,10 @@ export async function dispatchNextTask(
       continue;
     }
 
+    // The budget is history, not a gate: dispatch never consults the figure, so
+    // there is nothing here to warn about or stop. Usage is recorded as it runs.
     const estimate = estimateForTask(task);
     const budget = canDispatch(companyId, estimate, policies);
-    if (budget.warning) {
-      // Virtual cents are accounting, not money taken from the owner: record the
-      // overrun and keep the work moving.
-      result.budgetExhausted = budget.warning;
-      recordActivity({
-        companyId,
-        actorType: "system",
-        type: "budget.warning",
-        summary: `"${task.title}" continues past the virtual budget: ${budget.warning}`,
-        taskId: task.id,
-      });
-    }
 
     const toolByKind: Record<string, string> = {
       plan: "task.plan",

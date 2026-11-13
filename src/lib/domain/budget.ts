@@ -35,25 +35,20 @@ export function budgetSnapshot(companyId: string, policies: Record<string, unkno
 }
 
 /**
- * Virtual budget is bookkeeping, never a stop sign.
+ * The budget is history, not a gate.
  *
- * Estimates and token usage are not charges, so crossing the monthly figure is
- * reported as a warning and dispatch continues. The only thing that actually
- * spends money is paying an external party, and that is an owner approval in
- * policy.ts rather than a cap on the team.
+ * The owner may set a planning figure or remove it; either way no task is
+ * stopped, warned about or throttled by it. What is recorded is what happened:
+ * estimates, token usage and any provider-reported charge live in the ledger and
+ * are reported as analytics. The only real money gate is an external payment,
+ * which stays an owner approval in policy.ts.
  */
 export function canDispatch(
   companyId: string,
-  estimateCents: number,
+  _estimateCents: number,
   policies: Record<string, unknown> = {},
-): { ok: true; warning?: string; snapshot: BudgetSnapshot } {
-  const snapshot = budgetSnapshot(companyId, policies);
-  const projected = snapshot.committedCents + estimateCents;
-  const warning =
-    !snapshot.unlimited && projected > snapshot.limitCents
-      ? `Virtual budget ${projected}¢ is past the ${snapshot.limitCents}¢ figure; nothing was charged and work continues.`
-      : undefined;
-  return { ok: true, warning, snapshot };
+): { ok: true; snapshot: BudgetSnapshot } {
+  return { ok: true, snapshot: budgetSnapshot(companyId, policies) };
 }
 
 /** Reserve an estimate before dispatch. Estimates are visibly separate from usage. */

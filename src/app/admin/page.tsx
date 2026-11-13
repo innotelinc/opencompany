@@ -15,7 +15,8 @@ import { getProviderHealth } from "@/lib/domain/provider";
 import { ALL_CHECKS, checkDescription } from "@/lib/engine/checks";
 import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
-import { BudgetForm, SiteProbeButton } from "@/components/BudgetControls";
+import { BudgetSettings, SiteProbeButton, SpendHistory } from "@/components/BudgetControls";
+import { spendAnalytics } from "@/lib/domain/analytics";
 import { lastProbe, publicSiteUrl } from "@/lib/public-site/uptime";
 import { deploymentFeed } from "@/lib/domain/deployments";
 
@@ -29,6 +30,7 @@ export default async function AdministrationPage() {
   const employees = listEmployees(company.id);
   const policies = getPolicies(company.id);
   const budget = budgetSnapshot(company.id, policies);
+  const spend = spendAnalytics(company.id, 14);
   const ledger = listLedger(company.id, 40);
   const external = listExternalActions(company.id);
   const reports = listReports(company.id);
@@ -115,16 +117,22 @@ export default async function AdministrationPage() {
           </p>
         </Panel>
 
-        <Panel title="Budgets and usage" hint="Estimates are not invoices">
-          <BudgetForm
+        <Panel title="Spending" hint="History, not a gate">
+          <BudgetSettings
             limitCents={budget.limitCents}
             autoApproveCents={Number(policies["budget.auto_approve_cents"] ?? config.limits.autoApproveCents)}
           />
-          <div className="grid three" style={{ marginBottom: 12 }}>
-            <div className="metric"><span className="label">Limit</span><span className="value">{budget.unlimited ? "none" : (budget.limitCents / 100).toFixed(2)}</span><span className="hint">{budget.unlimited ? "no ceiling · still metered" : "USD / month"}</span></div>
-            <div className="metric"><span className="label">Committed</span><span className="value">{(budget.committedCents / 100).toFixed(2)}</span><span className="hint">estimates + usage</span></div>
-            <div className="metric"><span className="label">Tokens</span><span className="value">{budget.modelTokensIn + budget.modelTokensOut}</span><span className="hint">recorded</span></div>
-          </div>
+          <SpendHistory
+            days={spend.days}
+            byCategory={spend.byCategory}
+            totalCents={spend.totalCents}
+            entries={spend.entries}
+            peakDay={spend.peakDay ? { label: spend.peakDay.label, cents: spend.peakDay.cents } : null}
+          />
+          <div className="hr" />
+          <p className="tiny faint" style={{ margin: "0 0 8px" }}>
+            {(budget.modelTokensIn + budget.modelTokensOut).toLocaleString()} tokens recorded across the ledger.
+          </p>
           <table>
             <thead><tr><th>Kind</th><th>Category</th><th className="num">Cents</th><th>Note</th></tr></thead>
             <tbody>
@@ -140,8 +148,9 @@ export default async function AdministrationPage() {
             </tbody>
           </table>
           <p className="tiny faint" style={{ marginTop: 10 }}>
-            Verified provider charges appear only when a provider reports them. Model pricing is not configured, so token
-            usage is recorded without inventing a dollar amount.
+            Nothing here throttles the team: the figure is for comparison, and work continues past it. Verified provider
+            charges appear only when a provider reports them, so token usage is recorded without inventing a dollar
+            amount.
           </p>
         </Panel>
       </div>

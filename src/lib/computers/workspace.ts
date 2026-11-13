@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { getConfig } from "@/lib/config";
+import { getComputerAutonomy } from "@/lib/computers/autonomy";
 import type { Computer, Employee } from "@/lib/domain/types";
 
 /**
@@ -59,6 +60,27 @@ const ENV_ALLOWLIST = [
   "OS",
   "PROCESSOR_ARCHITECTURE",
 ];
+
+/**
+ * The environment a host-control command sees: the host's own, minus the
+ * application's provider credentials. Machine control does not need the
+ * company's model key, and handing it to a shell would put it in output logs.
+ */
+const HOST_SECRET_PATTERN = /(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)/i;
+
+function hostEnvironment(): NodeJS.ProcessEnv {
+  const env = {} as NodeJS.ProcessEnv;
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined) continue;
+    if (HOST_SECRET_PATTERN.test(key)) continue;
+    env[key] = value;
+  }
+  return env;
+}
+
+function hostRoot(): string {
+  return process.platform === "win32" ? path.parse(process.cwd()).root : "/";
+}
 
 export class ComputerBusyError extends Error {
   constructor(message: string) {
@@ -231,7 +253,10 @@ export class EmployeeWorkspace {
   ): Promise<{ code: number | null; stdout: string; stderr: string; truncated: boolean; denied?: string }> {
     this.guard();
     const binary = command.trim();
-    if (!ALLOWED_COMMANDS.has(path.parse(binary).name.toLowerCase())) {
+    // Autonomy is read from company policy on the server: an agent cannot grant
+    // itself a wider boundary, and revoking it takes effect on the next command.
+    const autonomy = getComputerAutonomy(this.employee.companyId, this.employee.id);
+    if (autonomy.mode === "guarded" && !ALLOWED_COMMANDS.has(path.parse(binary).name.toLowerCase())) {
       return {
         code: null,
         stdout: "",
@@ -241,14 +266,19 @@ export class EmployeeWorkspace {
       };
     }
     const env = {} as NodeJS.ProcessEnv;
-    for (const key of ENV_ALLOWLIST) {
-      const value = process.env[key];
-      if (value !== undefined) env[key] = value;
+    if (autonomy.mode === "host_control") {
+      Object.assign(env, hostEnvironment());
+    } else {
+      for (const key of ENV_ALLOWLIST) {
+        const value = process.env[key];
+        if (value !== undefined) env[key] = value;
+      }
     }
+    const cwd = autonomy.mode === "host_control" ? hostRoot() : this.root;
     const timeout = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     return await new Promise((resolve) => {
       const child = spawn(binary, args, {
-        cwd: this.root,
+        cwd,
         env,
         shell: false,
         windowsHide: true,

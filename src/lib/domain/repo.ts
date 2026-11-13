@@ -54,6 +54,8 @@ function mapEmployee(r: any): Employee {
     allowedTools: parseJson<string[]>(r.allowed_tools, []),
     authority: r.authority,
     spendLimitCents: r.spend_limit_cents,
+    terminatedAt: r.terminated_at ?? null,
+    terminationReason: r.termination_reason ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -277,11 +279,39 @@ export function listDepartments(companyId: string): Department[] {
     }));
 }
 
+/** The current roster. Fired employees are kept, but they are not on it. */
 export function listEmployees(companyId: string): Employee[] {
   return getDb()
-    .prepare("SELECT * FROM employees WHERE company_id = ? ORDER BY created_at")
+    .prepare("SELECT * FROM employees WHERE company_id = ? AND terminated_at IS NULL ORDER BY created_at")
     .all(companyId)
     .map(mapEmployee);
+}
+
+/** Former employees, newest departure first. */
+export function listFormerEmployees(companyId: string): Employee[] {
+  return getDb()
+    .prepare(
+      "SELECT * FROM employees WHERE company_id = ? AND terminated_at IS NOT NULL ORDER BY terminated_at DESC",
+    )
+    .all(companyId)
+    .map(mapEmployee);
+}
+
+/**
+ * Soft delete. The row stays so tasks, runs, ledger entries and audit events
+ * that point at it still resolve; every roster query excludes it afterwards.
+ */
+export function terminateEmployeeRecord(
+  companyId: string,
+  employeeId: string,
+  reason: string,
+): void {
+  getDb()
+    .prepare(
+      `UPDATE employees SET terminated_at = ?, termination_reason = ?, paused = 1, status = 'paused',
+        updated_at = ? WHERE company_id = ? AND id = ? AND terminated_at IS NULL`,
+    )
+    .run(nowIso(), reason, nowIso(), companyId, employeeId);
 }
 
 export function getEmployee(companyId: string, id: string): Employee | null {
