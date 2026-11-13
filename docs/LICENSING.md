@@ -2,7 +2,7 @@
 
 ## This application
 
-OpenCompany application code is released under the **MIT License** (see
+OPENco. application code is released under the **MIT License** (see
 `LICENSE`). It was written for this project. No source files from the inspected
 repositories were copied into this repository; their ideas, data-model shapes and
 operational contracts informed the design, and the code here is an independent

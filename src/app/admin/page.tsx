@@ -314,7 +314,7 @@ export default async function AdministrationPage() {
 
         <Panel title="Licensing and dependency path" hint="Read docs/LICENSING.md">
           <p className="small muted">
-            OpenCompany is MIT-licensed application code, written for this project. It uses CopilotKit packages
+            OPENco. is MIT-licensed application code, written for this project. It uses CopilotKit packages
             (MIT, pinned 1.85.0) for chat and AG-UI interaction, Next.js (MIT) and better-sqlite3 (MIT).
           </p>
           <p className="small muted">

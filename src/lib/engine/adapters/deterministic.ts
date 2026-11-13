@@ -31,7 +31,7 @@ export function parseBrief(text: string): BriefFacts {
   const sectionsRaw = get("Sections", "Home, About, Services, Contact");
   return {
     customer: get("Customer", "New client"),
-    industry: get("Industry", "independent bookkeeping studio"),
+    industry: get("Industry", "professional services"),
     sections: sectionsRaw
       .split(",")
       .map((section) => section.trim())
@@ -273,26 +273,26 @@ main p a:hover, main li a:hover, .card a:hover, .site-footer a:hover { color: va
 
 function siteFiles(facts: BriefFacts): Record<string, string> {
   const services = [
-    ["Monthly bookkeeping", "Clean books, reconciled accounts and a plain-language summary you can actually read."],
-    ["Payroll support", "Payroll runs, filings and questions handled before they become deadlines."],
-    ["Cash-flow advisory", "A short monthly session on what the numbers mean and what to do next."],
+    ["Discovery", "A short, structured conversation that turns what you need into something we can actually build."],
+    ["Design and build", "A small, fast site in plain HTML and one stylesheet. No trackers, no external assets, no surprises."],
+    ["Care after launch", "Checks, small changes and a yearly review, so the site stays fast and correct."],
   ];
 
   const home = shell({
     facts,
     active: "home",
-    title: `${facts.customer} — clear books for ${facts.industry}s`,
-    description: `Calm, precise bookkeeping for ${facts.industry}s. Monthly close, payroll support and straightforward cash-flow advice.`,
+    title: `${facts.customer} — ${facts.industry}`,
+    description: `Small, careful websites for ${facts.industry}: scoped in plain language, built, checked and shipped.`,
     body: `    <section class="hero">
       <div>
-        <p class="eyebrow">Bookkeeping studio</p>
-        <h1>Clear numbers. No surprises.</h1>
-        <p>${esc(facts.customer)} keeps the books for ${esc(facts.industry)}s who would rather spend their evening on anything else.</p>
-        <a class="button" href="contact.html">Book a intro call</a>
+        <p class="eyebrow">Studio</p>
+        <h1>Clear work. No surprises.</h1>
+        <p>${esc(facts.customer)} builds small, careful websites for ${esc(facts.industry)}. The scope is written in plain language before anything is built.</p>
+        <a class="button" href="contact.html">Start a conversation</a>
       </div>
       <div class="card">
-        <h2>What a month looks like</h2>
-        <p>Reconciled accounts by the 5th, a one-page summary by the 7th, and a short call if anything needs a decision.</p>
+        <h2>What a project looks like</h2>
+        <p>A brief you can read in a minute, a build you can check for yourself, and a review before anything is published.</p>
       </div>
     </section>
 
@@ -314,7 +314,7 @@ ${services
     <section>
       <h2>Who we work with</h2>
       <p>${esc(facts.notes)}</p>
-      <p>Engagements start with a 30-minute review of your current books. If we are not the right fit, we will say so and point you somewhere better.</p>
+      <p>Engagements start with a 30-minute conversation about what the site has to do. If we are not the right fit, we will say so and point you somewhere better.</p>
     </section>`,
   });
 
@@ -322,23 +322,23 @@ ${services
     facts,
     active: "about",
     title: `About ${facts.customer}`,
-    description: `How ${facts.customer} works: plain language, fixed scope and books you can trust.`,
+    description: `How ${facts.customer} works: plain language, fixed scope and work you can check.`,
     body: `    <section>
       <p class="eyebrow">About</p>
       <h1>A small studio with a long memory</h1>
-      <p>${esc(facts.customer)} has looked after the books for ${esc(facts.industry)}s since 2016. We keep a small client list on purpose: the same person closes your books every month.</p>
+      <p>${esc(facts.customer)} has built and looked after websites since 2016, mostly for ${esc(facts.industry)}. We keep a short client list on purpose: the same people do the work every time.</p>
     </section>
     <section>
       <h2>How we work</h2>
       <div class="grid">
-        <article class="card"><h3>Plain language</h3><p>Statements arrive with a short paragraph explaining what changed and why it matters.</p></article>
-        <article class="card"><h3>Fixed scope</h3><p>Agreed monthly fee. Extra work is quoted before it starts.</p></article>
-        <article class="card"><h3>Careful hands</h3><p>Every close is reviewed by a second set of eyes before it reaches you.</p></article>
+        <article class="card"><h3>Plain language</h3><p>Scopes and updates arrive as plain sentences, not slide decks.</p></article>
+        <article class="card"><h3>Fixed scope</h3><p>An agreed price before work starts. Extra work is quoted first.</p></article>
+        <article class="card"><h3>Careful hands</h3><p>Every page is checked and reviewed by a second set of eyes before it goes live.</p></article>
       </div>
     </section>
     <section>
       <h2>Where to start</h2>
-      <p>Send over last quarter's statements and we will tell you what we would fix first — no charge, no pitch.</p>
+      <p>Send the address of a site you like and a sentence about what you need. We will tell you what we would build first — no charge, no pitch.</p>
       <a class="button secondary" href="contact.html">Start a conversation</a>
     </section>`,
   });
@@ -347,17 +347,17 @@ ${services
     facts,
     active: "contact",
     title: `Contact ${facts.customer}`,
-    description: `Tell ${facts.customer} about your books and what you need help with.`,
+    description: `Tell ${facts.customer} about the site you need.`,
     body: `    <section>
       <p class="eyebrow">Contact</p>
-      <h1>Tell us what your books look like</h1>
+      <h1>Tell us about the project</h1>
       <p>We answer within one business day. Nothing is automated: a person reads this.</p>
       <form class="contact-form" action="mailto:${esc(facts.contactEmail)}" method="post" enctype="text/plain">
         <label for="name">Your name</label>
         <input id="name" name="name" type="text" autocomplete="name" required>
         <label for="business">Business</label>
         <input id="business" name="business" type="text" autocomplete="organization">
-        <label for="message">What needs attention?</label>
+        <label for="message">What do you need?</label>
         <textarea id="message" name="message" rows="5" required></textarea>
         <button type="submit">Send</button>
       </form>
@@ -367,7 +367,7 @@ ${services
 
   const readme = `# ${facts.customer} — website deliverable
 
-Built by the OpenCompany demo team from the customer requirements document.
+Built by the OPENco. demo team from the customer requirements document.
 
 ## Files
 
@@ -383,7 +383,7 @@ Built by the OpenCompany demo team from the customer requirements document.
 
 ## Preview
 
-Open \`index.html\` locally, or use the Preview panel in OpenCompany.
+Open \`index.html\` locally, or use the Preview panel in OPENco..
 `;
 
   return {
@@ -404,7 +404,7 @@ function publicSiteFiles(brief: BriefFacts): Record<string, string> {
   // The company's own site is React-authored (src/lib/public-site/site.tsx) and
   // rendered to static files; only the brand facts come from the brief, so an
   // improvement pass cannot drift away from the owner's stated brand.
-  return renderPublicSite({ ...brief, customer: "OpenCompany" });
+  return renderPublicSite({ ...brief, customer: "OPENco." });
 }
 
 export class DeterministicBackend implements AgentBackend {
@@ -533,7 +533,7 @@ export class DeterministicBackend implements AgentBackend {
       return {
         summary: `Updated the company public site (${Object.keys(files).length} files) and ran ${ALL_CHECKS.length} available checks.`,
         deliverable: {
-          name: "OpenCompany public site",
+          name: "OPENco. public site",
           kind: "website",
           entryFile: "index.html",
           notes: "Static public site generated from the public site brief. Served at /site after checks pass; nothing is published externally.",

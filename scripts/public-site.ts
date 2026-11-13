@@ -28,14 +28,14 @@ export const PUBLIC_SITE_BRIEF = "Public site brief";
 export const PUBLIC_SITE_EMPLOYEE = "Nova Reyes";
 
 const PUBLIC_SITE_KNOWLEDGE = [
-  "Customer: OpenCompany",
+  "Customer: OPENco.",
   "Industry: AI company operating system",
   "Sections: Home, About, Principles, Contact",
   "Tone: direct, calm, technically credible",
-  "Contact email: hello@opencompany.test",
+  "Contact email: hello@openco.innotel.tech",
   "Primary color: #1f3d34",
   "Accent color: #d8a24a",
-  "Notes: Owners set direction, budget and approvals; AI employees plan, build, check and review the work. Nothing external happens without the owner.",
+  "Notes: OPENco. by Innotel Labs. Owners set direction, budget and approvals; AI employees plan, build, check and review the work. Nothing external happens without the owner.",
   "Constraints: static files only; no trackers or external assets; the contact form must not claim a backend.",
   "Availability: this site is the company's public face and must answer 24/7. Keep the last passing version online; never let an improvement pass take the site down.",
 ].join("\n");

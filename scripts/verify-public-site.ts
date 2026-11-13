@@ -23,11 +23,11 @@ async function main() {
   const workerId = `public-site-check-${process.pid}`;
   for (let tick = 0; tick < 20; tick += 1) {
     await workerTick(companyId, workerId);
-    const deliverable = listDeliverables(companyId).find((item) => item.name === "OpenCompany public site");
+    const deliverable = listDeliverables(companyId).find((item) => item.name === "OPENco. public site");
     const version = deliverable ? latestDeliverableVersion(companyId, deliverable.id) : null;
     if (version?.checksPassed) break;
   }
-  const deliverable = listDeliverables(companyId).find((item) => item.name === "OpenCompany public site");
+  const deliverable = listDeliverables(companyId).find((item) => item.name === "OPENco. public site");
   const version = deliverable ? latestDeliverableVersion(companyId, deliverable.id) : null;
   console.log(
     version

@@ -160,7 +160,7 @@ with `npx tsx scripts/approve-plan.ts`.
 
 The public face of the company is served, read-only and without an owner session, at
 `/site` (and `/site/<asset>`). It renders the latest **check-passing** version of the
-`OpenCompany public site` deliverable. Before such a version exists it returns a
+`OPENco. public site` deliverable. Before such a version exists it returns a
 "being built" page, and an unapproved or failed version is never exposed.
 
 `scripts/public-site.ts` seeds the `Public Site Developer` employee, the public-site
@@ -190,7 +190,7 @@ COOLIFY_APP_UUID=...   # the application's uuid, not its name
 OPENCOMPANY_DEPLOY_NAME=opencompany-site
 ```
 
-The OpenCompany application on that instance is a Docker Compose resource built
+The OPENco. application on that instance is a Docker Compose resource built
 from `docker-compose.coolify.yaml`, and it is published at
 `http://opencompany.73.68.203.71.sslip.io` through Coolify's proxy. Coolify
 keeps a compose application's domains per service in `docker_compose_domains`,

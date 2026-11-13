@@ -13,7 +13,7 @@ import { rewritePublicUrls } from "@/lib/public-site/rewrite-urls";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PUBLIC_SITE_NAME = "OpenCompany public site";
+const PUBLIC_SITE_NAME = "OPENco. public site";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -30,7 +30,7 @@ const FALLBACK = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OpenCompany — public site in progress</title>
+  <title>OPENco. — public site in progress</title>
   <style>
     body { margin: 0; min-height: 100vh; display: grid; place-items: center;
       background: #f7f4ee; color: #16201c;

@@ -1,4 +1,4 @@
-# OpenCompany — an AI Company Operating System
+# OPENco. — an AI Company Operating System
 
 AI employees run authorized work. The human owner sets direction, budget and
 approval boundaries, then returns to results, an operating report and a short
@@ -59,7 +59,7 @@ server: it is never sent to the browser and never placed in a prompt.
 
 ## What the first slice does
 
-The seeded company is **Northwind Studio**, a fictional website studio:
+The seeded company is **OPENco.**, the AI company run by **Innotel Labs** (openco.innotel.tech):
 
 | Employee | Role | Authority |
 |---|---|---|
@@ -70,7 +70,7 @@ The seeded company is **Northwind Studio**, a fictional website studio:
 | Priya Raman | Quality Reviewer | internal |
 
 The owner submits: *“Prepare a small website for this customer using the
-attached requirements.”* With fictional customer **Larkspur & Ledger**:
+attached requirements.”* With **OPENco.** itself as the customer, via openco.innotel.tech:
 
 1. The brief and requirements are saved as a goal and a knowledge document.
 2. The CEO proposes a project, two dependent tasks, acceptance criteria, required

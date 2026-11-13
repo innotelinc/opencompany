@@ -40,8 +40,8 @@ test("fragments, queries and directory links stay usable", () => {
 
 test("external, absolute and in-page targets are left alone", () => {
   const html = [
-    `<a href="mailto:hello@opencompany.test">Mail</a>`,
-    `<form action="mailto:hello@opencompany.test" method="post"></form>`,
+    `<a href="mailto:hello@openco.innotel.tech">Mail</a>`,
+    `<form action="mailto:hello@openco.innotel.tech" method="post"></form>`,
     `<a href="https://example.com/about">Elsewhere</a>`,
     `<link href="//cdn.example.com/site.css">`,
     `<a href="/site/contact.html">Contact</a>`,

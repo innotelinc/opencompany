@@ -9,7 +9,7 @@ import LiveStrip from "@/components/LiveStrip";
 import { NavLink } from "@/components/NavLink";
 
 export const metadata: Metadata = {
-  title: "OpenCompany — AI Company Operating System",
+  title: "OPENco. — AI company operating system by Innotel Labs",
   description: "AI employees run authorized work; the human owner holds authority, budget and approvals.",
 };
 
@@ -30,9 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="brand" style={{ textDecoration: "none", color: "inherit" }}>
               <span className="brand-mark">C</span>
               <span>
-                <span className="brand-name">OpenCompany</span>
+                <span className="brand-name">OPENco.</span>
                 <br />
-                <span className="brand-sub">AI Company OS</span>
+                <span className="brand-sub">by Innotel Labs</span>
               </span>
             </Link>
 

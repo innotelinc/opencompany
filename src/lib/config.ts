@@ -19,7 +19,7 @@ export function getConfig() {
   return {
     dataDir,
     dbPath: path.resolve(process.env.OPENCOMPANY_DB ?? path.join(dataDir, "opencompany.db")),
-    ownerEmail: process.env.OPENCOMPANY_OWNER_EMAIL ?? "owner@northwind-studio.test",
+    ownerEmail: process.env.OPENCOMPANY_OWNER_EMAIL ?? "owner@openco.innotel.tech",
     companySlug: process.env.OPENCOMPANY_COMPANY_SLUG ?? "northwind-studio",
     agentBackend: (process.env.OPENCOMPANY_AGENT_BACKEND ?? "deterministic").toLowerCase(),
     model: process.env.OPENCOMPANY_MODEL ?? "gpt-4.1-mini",

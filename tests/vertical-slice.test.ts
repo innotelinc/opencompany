@@ -44,7 +44,7 @@ test("owner brief becomes an approved, reviewed, reported deliverable", async (t
   const brief = submitOwnerBrief({
     companyId,
     ownerId: owner.id,
-    title: "Prepare a small website for Larkspur & Ledger",
+    title: "Prepare a small website for OPENco.",
     brief: "Prepare a small website for this customer using the attached requirements.",
     requirements: REQUIREMENTS,
     budgetCents: 500,

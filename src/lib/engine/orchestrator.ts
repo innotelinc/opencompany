@@ -604,7 +604,7 @@ export async function executeClaimedRun(input: {
         })()
       : /public site/i.test(task.title)
         ? (() => {
-            const site = getDeliverableByName(companyId, "OpenCompany public site");
+            const site = getDeliverableByName(companyId, "OPENco. public site");
             return site
               ? listDeliverableVersions(companyId, site.id).find((version) => version.checksPassed) ?? null
               : null;
@@ -1052,7 +1052,7 @@ function handleWork(input: {
   // Public-site passes must update the one canonical site that /site serves,
   // not a new model-named deliverable each hour.
   const isPublicSite = /public site/i.test(task.title);
-  const deliverableName = isPublicSite ? "OpenCompany public site" : outcome.deliverable.name;
+  const deliverableName = isPublicSite ? "OPENco. public site" : outcome.deliverable.name;
   let deliverable = isPublicSite
     ? getDeliverableByName(companyId, deliverableName)
     : getDeliverableForTask(companyId, task.id);

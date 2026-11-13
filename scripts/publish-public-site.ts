@@ -34,9 +34,9 @@ if (!company) throw new Error("No company found. Run `npm run db:seed` first.");
 const files = new Map(
   Object.entries(
     renderPublicSite({
-      customer: "OpenCompany",
+      customer: "OPENco.",
       industry: "AI company operating system",
-      contactEmail: "hello@opencompany.test",
+      contactEmail: "hello@openco.innotel.tech",
       primaryColor: "#1f3d34",
       accentColor: "#d8a24a",
       tone: "direct, calm, technically credible",
@@ -60,14 +60,14 @@ if (!checksPassed(checks)) {
 }
 
 const owner = listEmployees(company.id).find((employee) => /Public Site Developer/i.test(employee.title));
-const existing = getDeliverableByName(company.id, "OpenCompany public site");
+const existing = getDeliverableByName(company.id, "OPENco. public site");
 const deliverable =
   existing ??
   createDeliverable({
     companyId: company.id,
     projectId: null,
     taskId: null,
-    name: "OpenCompany public site",
+    name: "OPENco. public site",
     kind: "website",
   });
 

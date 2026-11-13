@@ -28,11 +28,11 @@ const live = process.argv.includes("--live");
 if (!live) process.env.OPENCOMPANY_AGENT_BACKEND = "deterministic";
 
 const REQUIREMENTS = [
-  "Customer: Larkspur & Ledger",
-  "Industry: independent bookkeeping studio",
+  "Customer: OPENco.",
+  "Industry: AI company operating system",
   "Sections: Home, About, Services, Contact",
   "Tone: calm, precise, human",
-  "Contact email: hello@larkspur-ledger.test",
+  "Contact email: hello@openco.innotel.tech",
   "Primary color: #1f3d34",
   "Accent color: #d8a24a",
   "Notes: Small business owners who want clear numbers and no surprises.",
@@ -41,7 +41,7 @@ const REQUIREMENTS = [
 
 async function main() {
   const config = getConfig();
-  console.log(`\nOpenCompany demo — backend: ${config.agentBackend}${live ? " (live model)" : " (simulated, no model calls)"}`);
+  console.log(`\nOPENco. demo — backend: ${config.agentBackend}${live ? " (live model)" : " (simulated, no model calls)"}`);
   seedCompany();
   const company = getCompanyBySlug(config.companySlug)!;
   const owner = getOwner(company.id);
@@ -49,7 +49,7 @@ async function main() {
   const brief = submitOwnerBrief({
     companyId: company.id,
     ownerId: owner.id,
-    title: "Prepare a small website for Larkspur & Ledger",
+    title: "Prepare a small website for OPENco.",
     brief:
       "Prepare a small website for this customer using the attached requirements. Keep it to three pages, run the checks, and bring me the deployment decision before anything is published.",
     requirements: REQUIREMENTS,

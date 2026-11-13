@@ -87,8 +87,8 @@ export function seedCompany(options: { reset?: boolean } = {}) {
       .run(
         companyId,
         config.companySlug,
-        "Northwind Studio",
-        "Ship small, careful websites for independent businesses, and never publish or contact anyone without the owner's approval.",
+        "OPENco.",
+        "Ship small, careful websites and internal tools for Innotel Labs, and never publish or contact anyone without the owner's approval.",
         "Plain language. Real checks before claims. Nothing external without a decision.",
         now,
       );
@@ -96,7 +96,7 @@ export function seedCompany(options: { reset?: boolean } = {}) {
       .prepare(
         "INSERT INTO human_members (id, company_id, name, email, role, authority, created_at) VALUES (?,?,?,?,?,?,?)",
       )
-      .run(newId("hum"), companyId, "Avery Lin", config.ownerEmail, "Owner & Chair", "owner", now);
+      .run(newId("hum"), companyId, "Innotel Labs", config.ownerEmail, "Owner & Chair", "owner", now);
     for (const [key, name] of Object.entries({
       executive: "Executive",
       operations: "Operations",

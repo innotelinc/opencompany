@@ -67,7 +67,7 @@ export function BriefForm({ defaultBudget = 500 }: { defaultBudget?: number }) {
   const [requirements, setRequirements] = useState(
     [
       "Customer: New client",
-      "Industry: independent bookkeeping studio",
+      "Industry: professional services",
       "Sections: Home, About, Services, Contact",
       "Tone: calm, precise, human",
       "Contact email: hello@example.test",

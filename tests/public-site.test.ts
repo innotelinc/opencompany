@@ -4,9 +4,9 @@ import { runChecks } from "../src/lib/engine/checks";
 import { renderPublicSite } from "../src/lib/public-site/site";
 
 const facts = {
-  customer: "OpenCompany",
+  customer: "OPENco.",
   industry: "AI company operating system",
-  contactEmail: "hello@opencompany.test",
+  contactEmail: "hello@openco.innotel.tech",
   primaryColor: "#1f3d34",
   accentColor: "#d8a24a",
 };

@@ -26,14 +26,14 @@ async function main() {
   submitOwnerBrief({
     companyId: company.id,
     ownerId: owner.id,
-    title: "Prepare a small website for Larkspur & Ledger",
+    title: "Prepare a small website for OPENco.",
     brief: "Prepare a small website for this customer using the attached requirements.",
     requirements: [
-      "Customer: Larkspur & Ledger",
-      "Industry: independent bookkeeping studio",
+      "Customer: OPENco.",
+      "Industry: AI company operating system",
       "Sections: Home, About, Services, Contact",
       "Tone: calm, precise, human",
-      "Contact email: hello@larkspur-ledger.test",
+      "Contact email: hello@openco.innotel.tech",
       "Notes: Small business owners who want clear numbers and no surprises.",
     ].join("\n"),
     budgetCents: 500,

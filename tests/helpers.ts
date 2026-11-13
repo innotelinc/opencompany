@@ -22,11 +22,11 @@ process.env.OPENCOMPANY_WORKER_POLL_MS = "50";
 export const testDir = dir;
 
 export const REQUIREMENTS = [
-  "Customer: Larkspur & Ledger",
-  "Industry: independent bookkeeping studio",
+  "Customer: OPENco.",
+  "Industry: AI company operating system",
   "Sections: Home, About, Services, Contact",
   "Tone: calm, precise, human",
-  "Contact email: hello@larkspur-ledger.test",
+  "Contact email: hello@openco.innotel.tech",
   "Notes: Small business owners who want clear numbers and no surprises.",
 ].join("\n");
 

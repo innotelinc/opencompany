@@ -1,4 +1,4 @@
-# Deploy OpenCompany with Coolify
+# Deploy OPENco. with Coolify
 
 This package runs the app on Coolify as two containers from one image:
 
@@ -102,7 +102,7 @@ CopilotKit Intelligence license key. There is no keyless bypass.
 
 ## Coolify versus the app's `deployment_package`
 
-`deployment_package` is an owner-approved external action inside OpenCompany that
+`deployment_package` is an owner-approved external action inside OPENco. that
 publishes a deliverable artifact. It currently uses Vercel's REST API and has no
 Coolify adapter: Coolify deploys from Git sources or container images, not from an
 uploaded static artifact. Coolify here is the **hosting target for this app**, not
