@@ -195,7 +195,7 @@ npm run deploy          # fetch origin/main, reset, build, restart, health check
 
 `scripts/deploy.sh` hard-resets the working tree to `origin/main`, installs dependencies only when `package.json` or `package-lock.json` moved, builds, restarts the web and worker services, then verifies `/api/health`. A failed build stops before the restart, so the previous build keeps serving.
 
-On the production host, `bash deploy/install-auto-deploy.sh` (once, as root) makes pushes deploy themselves: a systemd timer checks `origin/main` every minute and runs the same script when it has moved, because the host has no inbound access for a webhook. A push is live within about a minute, and `journalctl -u opencompany-autodeploy` shows what happened.
+On the production host, `bash deploy/install-auto-deploy.sh` (once, as root) makes pushes deploy themselves: a systemd timer checks `origin/main` every minute and runs the same script when it has moved, because the host has no inbound access for a webhook. A push is live within about a minute, and `journalctl -u opencompany-autodeploy` shows what happened. The same timer then calls `deploy/coolify-deploy.sh`, which asks Coolify to deploy that commit too — the Coolify mirror follows the box, so one push updates both hosts without a manual API call. It needs `COOLIFY_TOKEN` and `COOLIFY_APP_UUID` in the host's `.env` (and `COOLIFY_URL` if Coolify is not on `http://192.168.1.93:8000`); without them it prints a line and skips.
 
 Pushing to the host's bare mirror deploys too: the mirror's `post-receive` hook runs the same script.
 

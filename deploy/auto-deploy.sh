@@ -39,4 +39,9 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 fi
 
 echo "[auto-deploy] $(git rev-parse --short "$current") -> $(git rev-parse --short "$target") on $BRANCH"
-exec bash scripts/deploy.sh "$BRANCH"
+bash scripts/deploy.sh "$BRANCH"
+
+# The Coolify mirror follows the box. Its push webhook is rejected (the secret
+# GitHub stores no longer matches the app), so the same commit is pushed to
+# Coolify from here instead of being queued by GitHub.
+bash deploy/coolify-deploy.sh || echo "[auto-deploy] Coolify trigger failed; the box is up to date"
