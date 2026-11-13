@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 interface LiveSnapshot {
   at: string;
   halted: boolean;
-  worker: { alive: boolean; ageSeconds: number };
+  worker: { alive: boolean };
   counts: {
     employees: number;
     working: number;
@@ -17,30 +17,28 @@ interface LiveSnapshot {
   activity: { id: string; type: string; summary: string; at: string }[];
 }
 
-function ago(iso: string): string {
-  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
-  if (seconds < 5) return "now";
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.round(minutes / 60)}h`;
+/** Stable clock: the strip must not redraw just to age a timestamp. */
+function clock(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 /**
  * Live state that is always on screen, on every page.
  *
- * It polls a small endpoint instead of streaming, so it keeps working behind the
- * proxies and reloads this app has to survive: if a request fails the strip says
- * so rather than freezing on stale numbers.
+ * Polling is only how it learns that something happened. The strip compares what
+ * it received with what it already shows and commits new state only when the
+ * facts differ — a task starting, a run finishing, the worker dropping out — so
+ * a quiet company leaves the bar completely still. `at` and the worker's
+ * heartbeat age are deliberately not part of that comparison: they change on
+ * every request and would defeat the point.
  */
 export default function LiveStrip() {
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
-  const mounted = useRef(true);
+  const shown = useRef<string>("");
 
   useEffect(() => {
-    mounted.current = true;
+    let alive = true;
     let timer: ReturnType<typeof setTimeout>;
 
     const load = async () => {
@@ -48,23 +46,31 @@ export default function LiveStrip() {
         const response = await fetch("/api/live", { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = (await response.json()) as { ok?: boolean; error?: string } & LiveSnapshot;
-        if (!mounted.current) return;
         if (payload.ok === false) throw new Error(payload.error ?? "The live feed refused this request.");
-        setSnapshot(payload);
-        setFailure(null);
-      } catch (error) {
-        if (mounted.current) setFailure(error instanceof Error ? error.message : String(error));
-      } finally {
-        if (mounted.current) {
-          setTick((value) => value + 1);
-          timer = setTimeout(load, 2500);
+        if (!alive) return;
+
+        const latestId = payload.activity?.[0]?.id ?? "";
+        const signature = JSON.stringify([
+          payload.halted,
+          payload.worker.alive,
+          payload.counts,
+          latestId,
+        ]);
+        if (signature !== shown.current) {
+          shown.current = signature;
+          setSnapshot(payload);
+          setFailure(null);
         }
+      } catch (error) {
+        if (alive) setFailure(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (alive) timer = setTimeout(load, 2500);
       }
     };
 
     void load();
     return () => {
-      mounted.current = false;
+      alive = false;
       clearTimeout(timer);
     };
   }, []);
@@ -110,18 +116,18 @@ export default function LiveStrip() {
             <span className="live-event-text" key={latest.id}>
               {latest.summary}
             </span>
-            <span className="faint"> · {ago(latest.at)}</span>
+            <span className="faint"> · {clock(latest.at)}</span>
           </>
         ) : (
           <span className="faint">no activity yet</span>
         )}
       </span>
 
-      <span className="live-state" title={`snapshot ${tick}`}>
+      <span className="live-state">
         {snapshot?.halted ? (
           <span className="badge bad">stopped</span>
         ) : workerAlive ? (
-          <span className="badge ok">worker {snapshot?.worker.ageSeconds ?? 0}s</span>
+          <span className="badge ok">worker live</span>
         ) : (
           <span className="badge warn">worker offline</span>
         )}
