@@ -43,6 +43,9 @@ import {
   updateTask,
   updateDecision,
 } from "@/lib/domain/repo";
+
+/** The company's own public site is one standing deliverable, shared by every pass. */
+const PUBLIC_SITE_DELIVERABLE_NAME = "OPENco. public site";
 import { budgetSnapshot, canDispatch, recordSimulatedUsage, reserveEstimate, settleRunUsage } from "@/lib/domain/budget";
 import { proposeDecision } from "@/lib/domain/decisions";
 import { clearProviderOutage, getProviderHealth, recordProviderOutage } from "@/lib/domain/provider";
@@ -604,7 +607,7 @@ export async function executeClaimedRun(input: {
         })()
       : /public site/i.test(task.title)
         ? (() => {
-            const site = getDeliverableByName(companyId, "OPENco. public site");
+            const site = getDeliverableByName(companyId, PUBLIC_SITE_DELIVERABLE_NAME);
             return site
               ? listDeliverableVersions(companyId, site.id).find((version) => version.checksPassed) ?? null
               : null;
@@ -1052,7 +1055,7 @@ function handleWork(input: {
   // Public-site passes must update the one canonical site that /site serves,
   // not a new model-named deliverable each hour.
   const isPublicSite = /public site/i.test(task.title);
-  const deliverableName = isPublicSite ? "OPENco. public site" : outcome.deliverable.name;
+  const deliverableName = isPublicSite ? PUBLIC_SITE_DELIVERABLE_NAME : outcome.deliverable.name;
   let deliverable = isPublicSite
     ? getDeliverableByName(companyId, deliverableName)
     : getDeliverableForTask(companyId, task.id);
@@ -1189,9 +1192,31 @@ function handleReview(input: {
   if (!reviewedId) throw new Error("Review task has no subject.");
   const reviewed = getTask(companyId, reviewedId);
   if (!reviewed) throw new Error("Reviewed task no longer exists.");
-  const deliverable = getDeliverableForTask(companyId, reviewed.id);
+  // The company's own public site is one standing deliverable, not one per
+  // task: an improvement pass writes a new version of it. Resolve that by name
+  // so a pass's review inspects the site that exists instead of failing on a
+  // task-scoped lookup and asking for another review on every retry.
+  const deliverable =
+    getDeliverableForTask(companyId, reviewed.id) ??
+    (/^Public site\b/i.test(reviewed.title) ? getDeliverableByName(companyId, PUBLIC_SITE_DELIVERABLE_NAME) : null);
   const version = deliverable ? latestDeliverableVersion(companyId, deliverable.id) : null;
-  if (!deliverable || !version) throw new Error("Review found no deliverable to inspect.");
+  if (!deliverable || !version) {
+    // Nothing to inspect is a dead end, not a transient error: retrying only
+    // mints another review task that fails the same way.
+    updateTask(companyId, task.id, {
+      status: "blocked",
+      blockedReason: `No deliverable exists for "${reviewed.title}", so this review cannot inspect anything.`,
+    });
+    recordRunEvent({
+      companyId,
+      taskId: task.id,
+      employeeId: employee.id,
+      type: "review.blocked",
+      message: `No deliverable to review for "${reviewed.title}". Blocked instead of retrying.`,
+    });
+    result.blocked.push(task.id);
+    return;
+  }
 
   const verdict = outcome.review;
   if (!verdict) throw new Error("Reviewer returned no verdict. A review must state pass or fail.");
