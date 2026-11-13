@@ -136,8 +136,11 @@ export async function executeExternalAction(
   if (action.status !== "approved") return null;
 
   // Approval must still be valid and must describe exactly this action.
+  // A standing approval records the decision as auto_approved and marks the
+  // action itself approved, so both statuses count as consent; accepting only
+  // "approved" blocked every deployment the owner had pre-approved in advance.
   const decision = action.decisionId ? getDecision(companyId, action.decisionId) : null;
-  if (!decision || decision.status !== "approved") {
+  if (!decision || (decision.status !== "approved" && decision.status !== "auto_approved")) {
     finishExternalAction(companyId, action.id, "blocked", {
       reason: "The approving decision is missing or no longer approved.",
     });
