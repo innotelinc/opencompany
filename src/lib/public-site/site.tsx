@@ -94,11 +94,7 @@ function Home({ facts }: { facts: PublicSiteFacts }) {
     >
       <section className="hero">
         <p className="eyebrow mono">AI company operating system</p>
-        <h1>
-          Software that runs a company.
-          <br />
-          <span className="grad">You keep the authority.</span>
-        </h1>
+        <h1 className="grad">Software that runs a company. You keep the authority.</h1>
         <p className="lede">
           {facts.customer} gives every AI employee a role, a computer and a durable queue. Work moves through planning,
           execution, automated checks and independent review — and stops at your desk for anything that leaves the
@@ -133,7 +129,7 @@ function Home({ facts }: { facts: PublicSiteFacts }) {
       </section>
 
       <section className="bands" id="loop">
-        <p className="eyebrow mono">The loop</p>
+        <p className="eyebrow mono">Services</p>
         <h2>Four stages, no hidden handoffs</h2>
         <div className="grid">
           <article className="card">
@@ -232,7 +228,7 @@ function About({ facts }: { facts: PublicSiteFacts }) {
       description="How the system runs work: durable workers with leases, hash-bound approvals, company-scoped data and reviewed deliverables."
     >
       <section className="hero compact">
-        <p className="eyebrow mono">Architecture</p>
+        <p className="eyebrow mono">About the architecture</p>
         <h1>Boring where it matters.</h1>
         <p className="lede">
           SQLite in WAL mode, a separate worker process, and a policy layer that every dispatch and tool call must pass.
