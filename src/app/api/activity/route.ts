@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { listActivity, listRunEvents } from "@/lib/domain/repo";
+import { activityViews } from "@/lib/domain/activity-view";
 import { workerStatus } from "@/lib/domain/ops";
 import { unexpected } from "@/lib/api";
 
@@ -12,7 +13,8 @@ export async function GET() {
     const session = getSession();
     return NextResponse.json({
       ok: true,
-      activity: listActivity(session.company.id, 40),
+      // Same shape the Activity panel renders: byline, text and formatted policy values.
+      activity: activityViews(listActivity(session.company.id, 40)),
       runEvents: listRunEvents(session.company.id, { limit: 40 }),
       worker: workerStatus(),
       halted: session.company.haltedAt,

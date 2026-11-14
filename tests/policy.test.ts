@@ -6,6 +6,7 @@ import { actionHash } from "../src/lib/db";
 import { addLedgerEntry, getExternalAction, listDecisions, listExternalActions, listEmployees } from "../src/lib/domain/repo";
 import { proposeDecision, approveDecision, rejectDecision } from "../src/lib/domain/decisions";
 import { canDispatch, quarterReview } from "../src/lib/domain/budget";
+import { activityView } from "../src/lib/domain/activity-view";
 import { evaluateAction } from "../src/lib/policy";
 import { executeExternalAction } from "../src/lib/engine/external";
 import { closeDb, getDb } from "../src/lib/db";
@@ -90,6 +91,41 @@ test("real spending needs the owner; virtual budget never blocks", () => {
   assert.equal(removed.ok, true);
   assert.equal(removed.snapshot.unlimited, true);
   assert.equal(removed.snapshot.monthlyGuideCents, 0);
+});
+
+test("an activity view carries the byline and the formatted policy values", () => {
+  const view = activityView({
+    id: "evt_test",
+    companyId,
+    actorType: "system",
+    actorId: null,
+    type: "policy.updated",
+    summary: "Policy set outside the app: budget.annual_limit_cents = 1200000",
+    payload: { key: "budget.annual_limit_cents", from: null, to: 1200000, note: "confirmed" },
+    taskId: null,
+    projectId: null,
+    createdAt: new Date().toISOString(),
+  });
+  assert.equal(view.text, "budget.annual_limit_cents", "a policy row is titled by its key");
+  assert.equal(view.policy?.from, "not set");
+  assert.equal(view.policy?.to, "$12,000.00 (1200000¢)");
+  assert.equal(view.policy?.note, "confirmed");
+  assert.match(view.byline, /· system$/);
+
+  const plain = activityView({
+    id: "evt_plain",
+    companyId,
+    actorType: "employee",
+    actorId: developer.id,
+    type: "task.completed",
+    summary: "A task finished.",
+    payload: {},
+    taskId: null,
+    projectId: null,
+    createdAt: new Date().toISOString(),
+  });
+  assert.equal(plain.policy, null);
+  assert.equal(plain.text, "A task finished.");
 });
 
 test("the quarterly review compares each quarter with a quarter of the yearly budget", () => {
