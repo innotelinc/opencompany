@@ -5,6 +5,7 @@ import {
   ledgerTotals,
   listLedgerForRun,
   setPolicy,
+  spendBetween,
   spendCentsSince,
   supersedeLedgerEntry,
 } from "@/lib/domain/repo";
@@ -39,15 +40,23 @@ function quarterStart(now: Date = new Date()): string {
   return new Date(Date.UTC(now.getUTCFullYear(), firstMonthOfQuarter, 1)).toISOString();
 }
 
-export function budgetSnapshot(companyId: string, policies: Record<string, unknown> = {}): BudgetSnapshot {
-  const totals = ledgerTotals(companyId);
-  // Companies seeded before the budget was yearly still carry a monthly figure;
-  // twelve months of it is the yearly budget they meant.
+/**
+ * The yearly budget in cents.
+ *
+ * Companies seeded before the budget was yearly still carry a monthly figure;
+ * twelve months of it is the yearly budget they meant.
+ */
+export function resolveAnnualLimit(policies: Record<string, unknown> = {}): number {
   const legacyMonthly = policies["budget.monthly_limit_cents"];
-  const annualLimitCents = Number(
+  return Number(
     policies["budget.annual_limit_cents"] ??
       (legacyMonthly !== undefined ? Number(legacyMonthly) * 12 : getConfig().limits.annualBudgetCents),
   );
+}
+
+export function budgetSnapshot(companyId: string, policies: Record<string, unknown> = {}): BudgetSnapshot {
+  const totals = ledgerTotals(companyId);
+  const annualLimitCents = resolveAnnualLimit(policies);
   const committedCents =
     totals.estimatedCents + totals.recordedCents + totals.verifiedCents + totals.expenseCents;
   return {
@@ -63,6 +72,82 @@ export function budgetSnapshot(companyId: string, policies: Record<string, unkno
     unlimited: annualLimitCents <= 0,
     modelTokensIn: totals.modelTokensIn,
     modelTokensOut: totals.modelTokensOut,
+  };
+}
+
+export interface QuarterLine {
+  quarter: number;
+  label: string;
+  fromIso: string;
+  toIso: string;
+  spentCents: number;
+  entries: number;
+  /** One quarter of the yearly budget. */
+  paceCents: number;
+  state: "closed" | "current" | "upcoming";
+}
+
+export interface QuarterReview {
+  year: number;
+  annualLimitCents: number;
+  quarterGuideCents: number;
+  unlimited: boolean;
+  quarters: QuarterLine[];
+  /** Spend recorded in the quarters that have finished, plus the current one so far. */
+  yearToDateCents: number;
+  /** The same window of the yearly budget: closed quarters at full pace, the current one prorated. */
+  paceToDateCents: number;
+}
+
+const QUARTER_MONTHS = ["Jan–Mar", "Apr–Jun", "Jul–Sep", "Oct–Dec"];
+
+/**
+ * The quarterly review: what each quarter recorded against a quarter of the
+ * yearly budget. It is a comparison, not a check — nothing here stops work.
+ */
+export function quarterReview(
+  companyId: string,
+  policies: Record<string, unknown> = {},
+  now: Date = new Date(),
+): QuarterReview {
+  const year = now.getUTCFullYear();
+  const annualLimitCents = resolveAnnualLimit(policies);
+  const paceCents = annualLimitCents <= 0 ? 0 : Math.round(annualLimitCents / 4);
+  const currentQuarter = Math.floor(now.getUTCMonth() / 3);
+  const quarters: QuarterLine[] = [0, 1, 2, 3].map((index) => {
+    const fromIso = new Date(Date.UTC(year, index * 3, 1)).toISOString();
+    const toIso = new Date(Date.UTC(year, index * 3 + 3, 1)).toISOString();
+    const { cents, entries } = spendBetween(companyId, fromIso, toIso);
+    return {
+      quarter: index + 1,
+      label: `Q${index + 1} · ${QUARTER_MONTHS[index]}`,
+      fromIso,
+      toIso,
+      spentCents: cents,
+      entries,
+      paceCents,
+      state: index < currentQuarter ? "closed" : index === currentQuarter ? "current" : "upcoming",
+    };
+  });
+
+  const yearToDateCents = quarters
+    .filter((line) => line.state !== "upcoming")
+    .reduce((sum, line) => sum + line.spentCents, 0);
+  const quarterLengthMs = 1000 * 60 * 60 * 24 * 91;
+  const elapsedInQuarter = Math.min(
+    1,
+    Math.max(0, (now.getTime() - Date.parse(quarters[currentQuarter].fromIso)) / quarterLengthMs),
+  );
+  const paceToDateCents = Math.round(currentQuarter * paceCents + paceCents * elapsedInQuarter);
+
+  return {
+    year,
+    annualLimitCents,
+    quarterGuideCents: paceCents,
+    unlimited: annualLimitCents <= 0,
+    quarters,
+    yearToDateCents,
+    paceToDateCents,
   };
 }
 

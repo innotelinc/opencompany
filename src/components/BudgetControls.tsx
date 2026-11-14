@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import type { QuarterReview as QuarterReviewShape } from "@/lib/domain/budget";
 import { useRouter } from "next/navigation";
 
 async function post(url: string, body: unknown): Promise<{ ok: boolean; error?: string }> {
@@ -168,6 +169,77 @@ export function SpendHistory({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * The quarterly review: each quarter's recorded spend beside a quarter of the
+ * yearly budget. This is the comparison the owner adjusts the budget with at the
+ * end of a quarter; it never limits anything.
+ */
+export function QuarterReview({ review }: { review: QuarterReviewShape }) {
+  const variance = review.yearToDateCents - review.paceToDateCents;
+  return (
+    <div className="stack" style={{ gap: 12 }}>
+      <div className="grid three">
+        <div className="metric">
+          <span className="label">Recorded year to date</span>
+          <span className="value">${(review.yearToDateCents / 100).toFixed(2)}</span>
+          <span className="hint">{review.year}</span>
+        </div>
+        <div className="metric">
+          <span className="label">On pace</span>
+          <span className="value">{review.unlimited ? "—" : `$${(review.paceToDateCents / 100).toFixed(2)}`}</span>
+          <span className="hint">closed quarters plus this one so far</span>
+        </div>
+        <div className="metric">
+          <span className="label">{variance <= 0 ? "Under pace" : "Over pace"}</span>
+          <span className="value">{review.unlimited ? "—" : `$${(Math.abs(variance) / 100).toFixed(2)}`}</span>
+          <span className="hint">recorded, never enforced</span>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Quarter</th>
+            <th className="num">Recorded</th>
+            <th className="num">Quarter of budget</th>
+            <th className="num">Difference</th>
+            <th>State</th>
+          </tr>
+        </thead>
+        <tbody>
+          {review.quarters.map((line) => {
+            const difference = line.spentCents - line.paceCents;
+            return (
+              <tr key={line.quarter} style={{ opacity: line.state === "upcoming" ? 0.55 : 1 }}>
+                <td className="small">{line.label}</td>
+                <td className="num small">${(line.spentCents / 100).toFixed(2)}</td>
+                <td className="num small">{review.unlimited ? "—" : `$${(line.paceCents / 100).toFixed(2)}`}</td>
+                <td className="num small">
+                  {review.unlimited || line.state === "upcoming"
+                    ? "—"
+                    : `${difference >= 0 ? "+" : "−"}$${(Math.abs(difference) / 100).toFixed(2)}`}
+                </td>
+                <td className="tiny faint">
+                  {line.state === "current"
+                    ? "in progress"
+                    : line.state === "closed"
+                      ? `${line.entries} entries`
+                      : "not started"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <p className="tiny faint" style={{ margin: 0 }}>
+        A quarter is a quarter of the yearly budget. This is the number to adjust the budget against at the end of a
+        quarter; work is never stopped by it.
+      </p>
     </div>
   );
 }

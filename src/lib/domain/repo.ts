@@ -1423,6 +1423,21 @@ export function spendCentsSince(companyId: string, sinceIso: string): number {
   return Number(r?.total ?? 0);
 }
 
+/** Recorded, non-superseded spend inside a half-open window, with its entry count. */
+export function spendBetween(
+  companyId: string,
+  fromIso: string,
+  toIso: string,
+): { cents: number; entries: number } {
+  const r: any = getDb()
+    .prepare(
+      `SELECT COALESCE(SUM(amount_cents),0) AS total, COUNT(*) AS n FROM ledger_entries
+       WHERE company_id = ? AND superseded_by IS NULL AND created_at >= ? AND created_at < ?`,
+    )
+    .get(companyId, fromIso, toIso);
+  return { cents: Number(r?.total ?? 0), entries: Number(r?.n ?? 0) };
+}
+
 export function ledgerTotals(companyId: string): {
   estimatedCents: number;
   recordedCents: number;

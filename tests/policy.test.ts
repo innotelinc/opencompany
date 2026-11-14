@@ -5,7 +5,7 @@ import { getConfig } from "../src/lib/config";
 import { actionHash } from "../src/lib/db";
 import { addLedgerEntry, getExternalAction, listDecisions, listExternalActions, listEmployees } from "../src/lib/domain/repo";
 import { proposeDecision, approveDecision, rejectDecision } from "../src/lib/domain/decisions";
-import { canDispatch } from "../src/lib/domain/budget";
+import { canDispatch, quarterReview } from "../src/lib/domain/budget";
 import { evaluateAction } from "../src/lib/policy";
 import { executeExternalAction } from "../src/lib/engine/external";
 import { closeDb, getDb } from "../src/lib/db";
@@ -90,6 +90,26 @@ test("real spending needs the owner; virtual budget never blocks", () => {
   assert.equal(removed.ok, true);
   assert.equal(removed.snapshot.unlimited, true);
   assert.equal(removed.snapshot.monthlyGuideCents, 0);
+});
+
+test("the quarterly review compares each quarter with a quarter of the yearly budget", () => {
+  const midMay = new Date(Date.UTC(2026, 4, 15, 12));
+  const review = quarterReview(companyId, { "budget.annual_limit_cents": 40000 }, midMay);
+  assert.equal(review.year, 2026);
+  assert.equal(review.quarterGuideCents, 10000, "a quarter is a quarter of the yearly budget");
+  assert.deepEqual(
+    review.quarters.map((line) => line.state),
+    ["closed", "current", "upcoming", "upcoming"],
+  );
+  assert.equal(review.quarters[3].spentCents, 0, "a quarter that has not started records nothing");
+  assert.ok(
+    review.paceToDateCents > 14000 && review.paceToDateCents < 15000,
+    `one closed quarter plus most of this one, got ${review.paceToDateCents}`,
+  );
+
+  const removed = quarterReview(companyId, { "budget.annual_limit_cents": 0 }, midMay);
+  assert.equal(removed.unlimited, true);
+  assert.equal(removed.quarterGuideCents, 0);
 });
 
 test("an owner decision binds to the exact action and changes invalidate it", () => {

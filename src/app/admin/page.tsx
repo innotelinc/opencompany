@@ -8,14 +8,14 @@ import {
   listRoutines,
   listTasks,
 } from "@/lib/domain/repo";
-import { budgetSnapshot } from "@/lib/domain/budget";
+import { budgetSnapshot, quarterReview } from "@/lib/domain/budget";
 import { getPolicies } from "@/lib/domain/repo";
 import { workerStatus } from "@/lib/domain/ops";
 import { getProviderHealth } from "@/lib/domain/provider";
 import { ALL_CHECKS, checkDescription } from "@/lib/engine/checks";
 import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
-import { BudgetSettings, SiteProbeButton, SpendHistory } from "@/components/BudgetControls";
+import { BudgetSettings, QuarterReview, SiteProbeButton, SpendHistory } from "@/components/BudgetControls";
 import { spendAnalytics } from "@/lib/domain/analytics";
 import { lastProbe, publicSiteUrl } from "@/lib/public-site/uptime";
 import { deploymentFeed } from "@/lib/domain/deployments";
@@ -30,6 +30,7 @@ export default async function AdministrationPage() {
   const employees = listEmployees(company.id);
   const policies = getPolicies(company.id);
   const budget = budgetSnapshot(company.id, policies);
+  const review = quarterReview(company.id, policies);
   const spend = spendAnalytics(company.id, 14);
   const ledger = listLedger(company.id, 40);
   const external = listExternalActions(company.id);
@@ -155,6 +156,10 @@ export default async function AdministrationPage() {
           </p>
         </Panel>
       </div>
+
+      <Panel title={`Quarterly review · ${review.year}`} hint="Each quarter against a quarter of the yearly budget">
+        <QuarterReview review={review} />
+      </Panel>
 
       <div className="grid two">
         <Panel title="Policies" hint="Server-enforced at dispatch">
