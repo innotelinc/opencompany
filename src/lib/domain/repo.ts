@@ -539,6 +539,7 @@ export function createTask(input: {
   priority?: number;
   dependencies?: string[];
   status?: string;
+  blockedReason?: string | null;
   idempotencyKey?: string | null;
 }): Task {
   const db = getDb();
@@ -557,8 +558,9 @@ export function createTask(input: {
     db.prepare(
       `INSERT INTO tasks (id, company_id, project_id, parent_task_id, review_of_task_id, title,
         description, kind, acceptance_criteria, required_checks, status, assignee_id, created_by_id,
-        delegation_depth, max_attempts, max_review_rounds, priority, idempotency_key, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        delegation_depth, max_attempts, max_review_rounds, priority, idempotency_key, created_at, updated_at,
+        blocked_reason)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(
       id,
       input.companyId,
@@ -580,6 +582,7 @@ export function createTask(input: {
       input.idempotencyKey ?? null,
       now,
       now,
+      input.blockedReason ?? null,
     );
     for (const dependency of input.dependencies ?? []) {
       db.prepare(

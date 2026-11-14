@@ -965,6 +965,9 @@ function handlePlan(input: {
       maxReviewRounds: getConfig().limits.maxReviewRounds,
       dependencies,
       status: "blocked",
+      // Say why it is waiting. Work held for approval is not a fault, but an
+      // empty reason made it look stuck and gave the owner nothing to act on.
+      blockedReason: "Waiting for the owner to approve the plan.",
       idempotencyKey: `plan:${task.id}:${index}`,
     });
     created.push(createdTask);
