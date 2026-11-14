@@ -18,11 +18,11 @@
 #     one a container (running or stopped) still references, so rollback keeps
 #     working
 #   - dangling images, always; they are not referenced by anything
-#   - BuildKit cache, stopped containers and unused networks only once the disk
-#     is at or above $PRUNE_THRESHOLD percent, since that cache is what makes a
-#     rebuild fast
+#   - BuildKit cache, stopped containers, unused networks and images no container
+#     has referenced for a week, only once the disk is at or above
+#     $PRUNE_THRESHOLD percent, since that cache is what makes a rebuild fast
 #
-# It never touches another application's images, volumes or containers.
+# It never touches a running container, a volume, or an application's current image.
 #
 #   bash deploy/coolify-prune.sh          # on the Coolify host
 #   PRUNE_THRESHOLD=70 bash ...           # prune the build cache earlier
@@ -90,6 +90,11 @@ if [ "$used_now" -ge "$THRESHOLD" ]; then
   docker builder prune -af >/dev/null 2>&1 || true
   docker container prune -f --filter until=168h >/dev/null 2>&1 || true
   docker network prune -f >/dev/null 2>&1 || true
+  # Images no container references at all, once they are a week old. A build
+  # that is about to start has already pulled what it needs, so this only takes
+  # things nothing is going to run, and the age filter keeps a freshly built but
+  # not yet started image out of reach.
+  docker image prune -a -f --filter until=168h >/dev/null 2>&1 || true
   cache_state="pruned at ${used_now}%"
 fi
 
