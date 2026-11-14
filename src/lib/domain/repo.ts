@@ -1412,6 +1412,17 @@ export function listLedgerForRun(companyId: string, runId: string): LedgerEntry[
     }));
 }
 
+/** Recorded, non-superseded spend since an ISO timestamp. Used for the month and quarter views. */
+export function spendCentsSince(companyId: string, sinceIso: string): number {
+  const r: any = getDb()
+    .prepare(
+      `SELECT COALESCE(SUM(amount_cents),0) AS total FROM ledger_entries
+       WHERE company_id = ? AND superseded_by IS NULL AND created_at >= ?`,
+    )
+    .get(companyId, sinceIso);
+  return Number(r?.total ?? 0);
+}
+
 export function ledgerTotals(companyId: string): {
   estimatedCents: number;
   recordedCents: number;

@@ -17,64 +17,49 @@ export async function GET() {
 }
 
 /**
- * The owner sets the figures. A monthly limit of 0 means "no ceiling": work is
- * still metered and shown, it just never reports an overrun. Real spending is
- * still an approval in policy.ts, so removing the ceiling does not remove the
- * gate in front of money.
+ * The owner sets the yearly budget. It is measured monthly and adjusted
+ * quarterly on performance.
+ *
+ * A budget of 0 means "no budget": work is still metered and reported, and
+ * nothing changes about what gets done. There is no ceiling and no per-call
+ * budget — every task or goal that is set has to be completed.
  */
 export async function POST(request: Request) {
   try {
     const session = getSession();
-    const body = await readJson<{ monthlyLimitCents?: number | null; autoApproveCents?: number | null }>(request);
+    const body = await readJson<{ annualBudgetCents?: number | null; monthlyLimitCents?: number | null }>(
+      request,
+    );
 
-    if (body.monthlyLimitCents === undefined && body.autoApproveCents === undefined) {
-      return fail("Send a monthly limit, an auto-approval threshold, or both.");
+    if (body.annualBudgetCents === undefined && body.monthlyLimitCents === undefined) {
+      return fail("Send a yearly budget, or 0 to remove it.");
     }
 
-    const policies = getPolicies(session.company.id);
-
-    if (body.monthlyLimitCents !== undefined) {
-      const limit = body.monthlyLimitCents === null ? 0 : Number(body.monthlyLimitCents);
-      if (!Number.isFinite(limit) || limit < 0 || !Number.isInteger(limit)) {
-        return fail("The monthly limit must be a whole number of cents, or 0 for no ceiling.");
-      }
-      setPolicy(
-        session.company.id,
-        "budget.monthly_limit_cents",
-        limit,
-        limit === 0 ? "Company monthly spend ceiling: none." : "Company monthly spend ceiling in cents.",
-      );
-      recordActivity({
-        companyId: session.company.id,
-        actorType: "human",
-        actorId: session.owner.id,
-        type: "budget.updated",
-        summary:
-          limit === 0
-            ? "Owner removed the monthly budget ceiling; spending is still metered and approved."
-            : `Owner set the monthly budget ceiling to ${limit}¢.`,
-      });
+    // Older clients sent a monthly figure; twelve months is the yearly budget.
+    const raw = body.annualBudgetCents ?? (body.monthlyLimitCents ?? 0) * 12;
+    const annual = raw === null ? 0 : Number(raw);
+    if (!Number.isFinite(annual) || annual < 0 || !Number.isInteger(annual)) {
+      return fail("The budget must be a whole number of cents, or 0 for no budget.");
     }
 
-    if (body.autoApproveCents !== undefined) {
-      const threshold = body.autoApproveCents === null ? 0 : Number(body.autoApproveCents);
-      if (!Number.isFinite(threshold) || threshold < 0 || !Number.isInteger(threshold)) {
-        return fail("The auto-approval threshold must be a whole number of cents.");
-      }
-      setPolicy(
-        session.company.id,
-        "budget.auto_approve_cents",
-        threshold,
-        "Spend at or below this is inside delegated authority.",
-      );
-      recordActivity({
-        companyId: session.company.id,
-        actorType: "human",
-        actorId: session.owner.id,
-        type: "budget.updated",
-        summary: `Owner set the auto-approval threshold to ${threshold}¢.`,
-      });
-    }
+    setPolicy(
+      session.company.id,
+      "budget.annual_limit_cents",
+      annual,
+      annual === 0
+        ? "Yearly budget: none. Spend is recorded and reported."
+        : "Yearly budget in cents. Measured monthly, adjusted quarterly; never a ceiling.",
+    );
+    recordActivity({
+      companyId: session.company.id,
+      actorType: "human",
+      actorId: session.owner.id,
+      type: "budget.updated",
+      summary:
+        annual === 0
+          ? "Owner removed the yearly budget; spend is still recorded."
+          : `Owner set the yearly budget to ${annual}¢ (measured monthly, adjusted quarterly).`,
+    });
 
     const updated = getPolicies(session.company.id);
     return ok({ budget: budgetSnapshot(session.company.id, updated) });

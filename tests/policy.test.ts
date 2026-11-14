@@ -79,17 +79,17 @@ test("real spending needs the owner; virtual budget never blocks", () => {
   assert.match(overLimit.reason, /real money/);
 
   // Ledger cents are history, not a charge: the figure is reported, never enforced.
-  const past = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 5 });
+  const past = canDispatch(companyId, 10, { "budget.annual_limit_cents": 5 });
   assert.equal(past.ok, true);
   assert.deepEqual(past, { ok: true, snapshot: past.snapshot }, "a set figure must not add a warning or a block");
-  assert.equal(past.snapshot.limitCents, 5);
+  assert.equal(past.snapshot.annualLimitCents, 5);
   assert.equal(past.snapshot.unlimited, false);
 
   // The owner may remove the figure entirely; history keeps being recorded.
-  const removed = canDispatch(companyId, 10, { "budget.monthly_limit_cents": 0 });
+  const removed = canDispatch(companyId, 10, { "budget.annual_limit_cents": 0 });
   assert.equal(removed.ok, true);
   assert.equal(removed.snapshot.unlimited, true);
-  assert.equal(removed.snapshot.remainingCents, 0);
+  assert.equal(removed.snapshot.monthlyGuideCents, 0);
 });
 
 test("an owner decision binds to the exact action and changes invalidate it", () => {

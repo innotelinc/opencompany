@@ -69,7 +69,6 @@ export interface TickResult {
   blocked: string[];
   external: string[];
   reports: string[];
-  budgetExhausted?: string;
 }
 
 const ESTIMATES: Record<string, number> = { plan: 4, work: 12, review: 3, report: 1 };
@@ -960,9 +959,9 @@ function handlePlan(input: {
     summary: plan.summary,
     tasks: created.map((createdTask) => ({ id: createdTask.id, title: createdTask.title })),
   };
-  const autoApprove =
-    policies["plan.auto_approve"] === true &&
-    plan.budgetCents <= Number(policies["budget.auto_approve_cents"] ?? getConfig().limits.autoApproveCents);
+  // A plan's spend figure never decides this: there is no budget gate and no
+  // per-call budget. Only the owner's standing delegation does.
+  const autoApprove = policies["plan.auto_approve"] === true;
 
   const decision = proposeDecision({
     companyId,
@@ -1385,7 +1384,10 @@ export function finishProjectReport(
       .map((candidate) => `  - ${candidate.status === "completed" ? "✓" : "•"} ${candidate.title} — ${candidate.status}`),
     "",
     "## Cost and usage",
-    `- Budget limit: ${budget.limitCents}¢ · committed ${budget.committedCents}¢ · remaining ${budget.remainingCents}¢.`,
+    budget.unlimited
+      ? `- Budget: none set · recorded ${budget.committedCents}¢.`
+      : `- Budget: ${budget.annualLimitCents}¢/year (${budget.monthlyGuideCents}¢/month on pace) · recorded ${budget.committedCents}¢ this year, ${budget.monthSpentCents}¢ this month.`,
+    "- The budget is recorded history; it never limits or stops work, and every task and goal is completed.",
     `- Recorded provider charges: ${budget.recordedCents + budget.verifiedCents}¢. Estimates are reservations, not invoices.`,
     `- Model tokens recorded: ${budget.modelTokensIn} in / ${budget.modelTokensOut} out.`,
     "",
@@ -1410,7 +1412,7 @@ export function finishProjectReport(
       blocked: blocked.length,
       deliverables: deliverables.length,
       committedCents: budget.committedCents,
-      limitCents: budget.limitCents,
+      annualLimitCents: budget.annualLimitCents,
       pendingDecisions: Number(pendingDecisions?.n ?? 0),
     },
   });

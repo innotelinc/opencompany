@@ -47,8 +47,11 @@ export function getConfig() {
       },
     },
     limits: {
-      monthlyBudgetCents: num(process.env.OPENCOMPANY_MONTHLY_BUDGET_CENTS, 2500),
-      autoApproveCents: num(process.env.OPENCOMPANY_AUTO_APPROVE_CENTS, 300),
+      // The budget is yearly. It is measured monthly and adjusted quarterly on
+      // performance; the older monthly variable is read as a yearly figure only
+      // when it is the one that is set.
+      annualBudgetCents:
+        num(process.env.OPENCOMPANY_ANNUAL_BUDGET_CENTS, 0) || num(process.env.OPENCOMPANY_MONTHLY_BUDGET_CENTS, 0) * 12 || 100000,
       maxDelegationDepth: num(process.env.OPENCOMPANY_MAX_DELEGATION_DEPTH, 3),
       maxReviewRounds: num(process.env.OPENCOMPANY_MAX_REVIEW_ROUNDS, 2),
       maxAttempts: num(process.env.OPENCOMPANY_MAX_ATTEMPTS, 2),

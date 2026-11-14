@@ -46,7 +46,6 @@ async function tickOnce(): Promise<boolean> {
             blocked: result.blocked.length,
             external: result.external,
             reports: result.reports.length,
-            ...(result.budgetExhausted ? { budget: result.budgetExhausted } : {}),
           }),
         );
       }

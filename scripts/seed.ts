@@ -195,8 +195,12 @@ export function seedCompany(options: { reset?: boolean } = {}) {
     });
   }
 
-  setPolicy(companyId, "budget.monthly_limit_cents", config.limits.monthlyBudgetCents, "Company monthly spend ceiling in cents.");
-  setPolicy(companyId, "budget.auto_approve_cents", config.limits.autoApproveCents, "Spend inside delegated authority.");
+  setPolicy(
+    companyId,
+    "budget.annual_limit_cents",
+    config.limits.annualBudgetCents,
+    "Yearly budget in cents. Measured monthly, adjusted quarterly; never a ceiling.",
+  );
   setPolicy(companyId, "plan.auto_approve", false, "Plans always need the owner in this version.");
   setPolicy(companyId, "delegation.max_depth", config.limits.maxDelegationDepth, "Maximum delegation depth.");
   setPolicy(companyId, "review.max_rounds", config.limits.maxReviewRounds, "Bounded review loop.");

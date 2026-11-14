@@ -26,8 +26,7 @@ Copy `.env.example` to `.env`. Secrets belong in the server environment only.
 | `OPENCOMPANY_COMPANY_SLUG` | `northwind-studio` | Company resolved by the session |
 | `OPENCOMPANY_AGENT_BACKEND` | `deterministic` | `llm` for live agent work |
 | `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENCOMPANY_MODEL` | — | OpenAI-compatible provider |
-| `OPENCOMPANY_MONTHLY_BUDGET_CENTS` | 2500 | Hard dispatch ceiling |
-| `OPENCOMPANY_AUTO_APPROVE_CENTS` | 300 | Owner-approval threshold |
+| `OPENCOMPANY_ANNUAL_BUDGET_CENTS` | 100000 | Yearly budget; measured monthly, adjusted quarterly. Recorded, never enforced |
 | `OPENCOMPANY_MAX_DELEGATION_DEPTH` | 3 | |
 | `OPENCOMPANY_MAX_REVIEW_ROUNDS` | 2 | |
 | `OPENCOMPANY_MAX_ATTEMPTS` | 2 | Per task |
@@ -126,15 +125,16 @@ network segment until real sign-in is implemented.
   with that reason, and nothing is reported as successful.
 - **Human takeover**: Computers → Take control. The agent stops before its next
   action; the lock expires after 15 minutes or can be released.
-- **Budget exhausted**: tasks block with the exact committed/limit numbers. Raise
-  `budget.monthly_limit_cents` deliberately; employees cannot.
+- **Budget**: there is no exhausted state and nothing blocks on spend. The yearly
+  figure is recorded history, measured monthly and reviewed quarterly with
+  `budget.annual_limit_cents`; only the owner changes it.
 
 ## Security checklist before real use
 
 1. Add real sign-in and replace the configuration-resolved owner session.
 2. Run the worker in a container with resource and network limits.
 3. Use a secret manager for provider keys; rotate them outside the repo.
-4. Set a realistic monthly budget and per-employee limits.
+4. Set a realistic yearly budget. It is measured monthly and reviewed quarterly on performance; it never stops work.
 5. Keep `.data` out of version control and back it up (database + artifacts).
 6. Review `docs/LICENSING.md` before adding Intelligence or paid providers.
 

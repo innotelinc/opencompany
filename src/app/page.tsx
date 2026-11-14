@@ -32,8 +32,8 @@ export default function BoardroomPage() {
     pendingDecisions: pending.map((decision) => ({ id: decision.id, title: decision.title, kind: decision.kind })),
     budget: {
       committedCents: dash.budget.committedCents,
-      limitCents: dash.budget.limitCents,
-      remainingCents: dash.budget.remainingCents,
+      annualLimitCents: dash.budget.annualLimitCents,
+      monthSpentCents: dash.budget.monthSpentCents,
     },
     employees: dash.employees.map((employee) => ({ name: employee.name, title: employee.title, status: employee.status })),
     tasks: dash.tasks.slice(0, 20).map((task) => ({ title: task.title, status: task.status, kind: task.kind })),
@@ -98,13 +98,14 @@ export default function BoardroomPage() {
         </Panel>
         <Panel className="tight">
           <Metric
-            label="Budget committed"
+            label="Spend recorded"
             value={`${(dash.budget.committedCents / 100).toFixed(2)}`}
-            hint={`of ${(dash.budget.limitCents / 100).toFixed(2)} USD · ${dash.budget.remainingCents}¢ left`}
+            hint={
+              dash.budget.unlimited
+                ? `this month ${(dash.budget.monthSpentCents / 100).toFixed(2)} · no budget set`
+                : `this month ${(dash.budget.monthSpentCents / 100).toFixed(2)} · ${(dash.budget.annualLimitCents / 100).toFixed(2)} USD/yr budget`
+            }
           />
-          <div style={{ marginTop: 8 }}>
-            <Progress value={dash.budget.committedCents} max={dash.budget.limitCents} />
-          </div>
         </Panel>
         <Panel className="tight">
           <Metric
@@ -121,7 +122,7 @@ export default function BoardroomPage() {
             title="Owner console"
             hint="Instruction → CEO plan → approval"
           >
-            <BriefForm defaultBudget={Math.min(500, Math.max(100, dash.budget.remainingCents))} />
+            <BriefForm defaultBudget={Math.min(500, Math.max(100, dash.budget.monthlyGuideCents || 250))} />
           </Panel>
 
           <Panel title="Decisions awaiting the owner" hint={`${pending.length} pending`}>

@@ -294,19 +294,21 @@ export function pauseEmployee(input: { companyId: string; employeeId: string; ac
 }
 
 /**
- * Fire an employee through the portal.
+ * Fire an employee.
  *
- * This is a soft delete on purpose: the person comes off the roster immediately,
- * their in-flight work is cancelled and their pending decisions are invalidated,
- * but every task, run and ledger row keeps pointing at a real record, so the
- * audit trail and the money history stay intact.
+ * Firing is a company-level action: the person is terminated and removed from
+ * the company, not quietly detached from one task or role. Their open work is
+ * not cancelled — every task and goal that is set has to be completed — so it
+ * passes to the person above them, or the CEO, and keeps running. The record is
+ * a soft delete so tasks, runs, ledger rows and the audit trail still resolve,
+ * but the person is off the roster from that moment.
  */
 export function terminateEmployee(input: {
   companyId: string;
   employeeId: string;
   actorId: string;
   reason?: string;
-}): { cancelledTasks: number; invalidatedDecisions: number } {
+}): { reassignedTasks: number; handedTo: string | null } {
   const employee = getEmployee(input.companyId, input.employeeId);
   if (!employee) throw new Error("Employee not found in this company.");
   if (employee.terminatedAt) throw new Error(`${employee.name} has already left the company.`);
@@ -323,23 +325,24 @@ export function terminateEmployee(input: {
       "UPDATE task_runs SET cancel_requested = 1 WHERE company_id = ? AND employee_id = ? AND status IN ('queued','running')",
     )
     .run(input.companyId, employee.id);
+
+  // Work does not die with the person. It goes to their manager, otherwise the
+  // CEO, otherwise anyone still on staff and running.
+  const staff = listEmployees(input.companyId).filter((person) => person.id !== employee.id);
+  const successor =
+    staff.find((person) => person.id === employee.managerId && !person.paused) ??
+    staff.find((person) => /chief executive/i.test(person.title) && !person.paused) ??
+    staff.find((person) => !person.paused) ??
+    null;
+
   for (const task of owned) {
     updateTask(input.companyId, task.id, {
-      status: "cancelled",
-      cancelRequested: true,
-      blockedReason: `${employee.name} left the company.`,
+      status: task.status === "running" ? "pending" : task.status,
+      assigneeId: successor?.id ?? null,
+      blockedReason: successor
+        ? `Handed to ${successor.name}: ${employee.name} left the company.`
+        : `Waiting for the owner to hire someone: ${employee.name} left the company.`,
     });
-  }
-
-  let invalidatedDecisions = 0;
-  for (const decision of listDecisions(input.companyId, "pending")) {
-    if (decision.requestedByEmployeeId !== employee.id) continue;
-    updateDecision(input.companyId, decision.id, {
-      status: "invalidated",
-      invalidatedReason: `${employee.name} left the company before this was decided.`,
-      decidedBy: input.actorId,
-    });
-    invalidatedDecisions += 1;
   }
 
   releaseHumanControl(input.companyId, employee.id);
@@ -350,11 +353,11 @@ export function terminateEmployee(input: {
     actorType: "human",
     actorId: input.actorId,
     type: "employee.terminated",
-    summary: `Owner fired ${employee.name} (${employee.title}). ${owned.length} open task(s) cancelled, ${invalidatedDecisions} decision(s) invalidated.`,
+    summary: `Owner fired ${employee.name} (${employee.title}); removed from the company. ${owned.length} open task(s) kept and handed to ${successor?.name ?? "nobody yet"}.`,
     payload: { employeeId: employee.id, reason: input.reason ?? null, tasks: owned.map((task) => task.id) },
   });
 
-  return { cancelledTasks: owned.length, invalidatedDecisions };
+  return { reassignedTasks: owned.length, handedTo: successor?.name ?? null };
 }
 
 export function takeOverComputer(input: { companyId: string; employeeId: string; actorId: string }): void {

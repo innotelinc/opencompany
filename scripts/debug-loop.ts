@@ -52,8 +52,7 @@ async function main() {
     }
     const tasks = listTasks(company.id);
     console.log(
-      `tick ${tick}: dispatched=${result.dispatched.length} completed=${result.completed.length} blocked=${result.blocked.length}` +
-        ` budget=${result.budgetExhausted ?? "ok"}`,
+      `tick ${tick}: dispatched=${result.dispatched.length} completed=${result.completed.length} blocked=${result.blocked.length}`,
     );
     for (const task of tasks) {
       console.log(`   ${task.kind.padEnd(6)} ${task.status.padEnd(18)} ${task.title.slice(0, 62)}`);

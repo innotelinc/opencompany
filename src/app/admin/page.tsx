@@ -117,10 +117,11 @@ export default async function AdministrationPage() {
           </p>
         </Panel>
 
-        <Panel title="Spending" hint="History, not a gate">
+        <Panel title="Spending" hint="Recorded, never a ceiling">
           <BudgetSettings
-            limitCents={budget.limitCents}
-            autoApproveCents={Number(policies["budget.auto_approve_cents"] ?? config.limits.autoApproveCents)}
+            annualLimitCents={budget.annualLimitCents}
+            monthSpentCents={budget.monthSpentCents}
+            quarterSpentCents={budget.quarterSpentCents}
           />
           <SpendHistory
             days={spend.days}

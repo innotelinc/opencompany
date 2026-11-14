@@ -227,8 +227,9 @@ export function FireButton({ employeeId, name, openTasks }: { employeeId: string
   return (
     <div className="confirm">
       <p className="tiny" style={{ margin: 0 }}>
-        Remove {name}? {openTasks > 0 ? `${openTasks} open task(s) will be cancelled. ` : ""}The record, its tasks and
-        its spending history are kept.
+        Remove {name} from the company? The person is terminated and taken off the roster — not just taken off a task.{" "}
+        {openTasks > 0 ? `${openTasks} open task(s) stay in the company and pass to whoever is above them. ` : ""}The
+        record, its tasks and its spending history are kept.
       </p>
       <input
         value={reason}

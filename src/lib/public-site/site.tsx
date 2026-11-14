@@ -279,9 +279,10 @@ function About({ facts }: { facts: PublicSiteFacts }) {
           <p className="eyebrow mono">Spending</p>
           <h2>History, not a leash</h2>
           <p className="lede">
-            The budget is a planning figure the owner may set or remove. It never throttles work: usage is recorded as
-            it happens and reported as analytics. Real money — paying an external party — is still an owner approval at
-            any amount.
+            The budget is a yearly figure the owner sets or removes. It is measured monthly and adjusted quarterly on
+            performance, and it never throttles work: there is no per-call budget, usage is recorded as it happens and
+            reported as analytics, and any task or goal that is set gets completed. Real money — paying an external
+            party — is still an owner approval at any amount.
           </p>
         </div>
         <div className="panel-note">

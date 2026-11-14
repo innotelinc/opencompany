@@ -41,7 +41,7 @@ Compose file: [`docker-compose.coolify.yaml`](../../docker-compose.coolify.yaml)
 | `OPENAI_BASE_URL` | for local models | e.g. `http://host.docker.internal:11434/v1` for host Ollama. |
 | `OPENCOMPANY_MODEL` | for `llm` | Model name used by the worker and chat. |
 | `OPENCOMPANY_MODEL_FALLBACKS` | optional | Comma-separated fallback models. |
-| `OPENCOMPANY_MONTHLY_BUDGET_CENTS` | recommended | Server-enforced spend ceiling. |
+| `OPENCOMPANY_ANNUAL_BUDGET_CENTS` | recommended | Yearly budget, measured monthly and adjusted quarterly. Recorded, never enforced. |
 | `OPENCOMPANY_AUTO_APPROVE_CENTS` | recommended | Auto-approval threshold. |
 | `OPENCOMPANY_BROWSER_ENABLED` | optional | Keep `0`; the image does not include Chromium/Playwright. |
 | `OPENCOMPANY_DEPLOY_PROVIDER` + `VERCEL_*` | optional | Only for the app's `deployment_package` external action (currently Vercel). |

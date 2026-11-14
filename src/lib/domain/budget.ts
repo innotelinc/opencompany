@@ -1,47 +1,80 @@
 import { getConfig } from "@/lib/config";
-import { addLedgerEntry, getCompany, ledgerTotals, listLedgerForRun, setPolicy, supersedeLedgerEntry } from "@/lib/domain/repo";
+import {
+  addLedgerEntry,
+  getCompany,
+  ledgerTotals,
+  listLedgerForRun,
+  setPolicy,
+  spendCentsSince,
+  supersedeLedgerEntry,
+} from "@/lib/domain/repo";
 
 export interface BudgetSnapshot {
+  /** The yearly budget the owner set, in cents. */
+  annualLimitCents: number;
+  /** One twelfth of the yearly budget: what a month looks like on pace. */
+  monthlyGuideCents: number;
+  /** One quarter of the yearly budget: the figure the quarterly review compares. */
+  quarterGuideCents: number;
+  /** Spend recorded since the first of this month. */
+  monthSpentCents: number;
+  /** Spend recorded since the first day of this quarter. */
+  quarterSpentCents: number;
   estimatedCents: number;
   recordedCents: number;
   verifiedCents: number;
   committedCents: number;
-  limitCents: number;
-  /** A limit of 0 means the owner removed the ceiling; spending is still metered. */
+  /** A budget of 0 means the owner removed the figure; spending is still metered. */
   unlimited: boolean;
-  remainingCents: number;
   modelTokensIn: number;
   modelTokensOut: number;
 }
 
+function monthStart(now: Date = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
+function quarterStart(now: Date = new Date()): string {
+  const firstMonthOfQuarter = Math.floor(now.getUTCMonth() / 3) * 3;
+  return new Date(Date.UTC(now.getUTCFullYear(), firstMonthOfQuarter, 1)).toISOString();
+}
+
 export function budgetSnapshot(companyId: string, policies: Record<string, unknown> = {}): BudgetSnapshot {
   const totals = ledgerTotals(companyId);
-  const limitCents = Number(
-    policies["budget.monthly_limit_cents"] ?? getConfig().limits.monthlyBudgetCents,
+  // Companies seeded before the budget was yearly still carry a monthly figure;
+  // twelve months of it is the yearly budget they meant.
+  const legacyMonthly = policies["budget.monthly_limit_cents"];
+  const annualLimitCents = Number(
+    policies["budget.annual_limit_cents"] ??
+      (legacyMonthly !== undefined ? Number(legacyMonthly) * 12 : getConfig().limits.annualBudgetCents),
   );
   const committedCents =
     totals.estimatedCents + totals.recordedCents + totals.verifiedCents + totals.expenseCents;
   return {
+    annualLimitCents,
+    monthlyGuideCents: annualLimitCents <= 0 ? 0 : Math.round(annualLimitCents / 12),
+    quarterGuideCents: annualLimitCents <= 0 ? 0 : Math.round(annualLimitCents / 4),
+    monthSpentCents: spendCentsSince(companyId, monthStart()),
+    quarterSpentCents: spendCentsSince(companyId, quarterStart()),
     estimatedCents: totals.estimatedCents,
     recordedCents: totals.recordedCents,
     verifiedCents: totals.verifiedCents,
     committedCents,
-    limitCents,
-    unlimited: limitCents <= 0,
-    remainingCents: limitCents <= 0 ? 0 : Math.max(0, limitCents - committedCents),
+    unlimited: annualLimitCents <= 0,
     modelTokensIn: totals.modelTokensIn,
     modelTokensOut: totals.modelTokensOut,
   };
 }
 
 /**
- * The budget is history, not a gate.
+ * There is no ceiling and there is no per-call budget.
  *
- * The owner may set a planning figure or remove it; either way no task is
- * stopped, warned about or throttled by it. What is recorded is what happened:
- * estimates, token usage and any provider-reported charge live in the ledger and
- * are reported as analytics. The only real money gate is an external payment,
- * which stays an owner approval in policy.ts.
+ * A budget is a yearly planning figure the owner sets or removes. It is measured
+ * monthly and adjusted quarterly on performance; it is a recording of what was
+ * spent, never a gate. No task, goal or plan is stopped, throttled or warned
+ * about by it, and any task or goal that is set has to be completed. The only
+ * real money gate is an external payment, which stays an owner approval in
+ * policy.ts.
  */
 export function canDispatch(
   companyId: string,
@@ -119,6 +152,10 @@ export function recordSimulatedUsage(companyId: string, runId: string, note: str
 export function ensureBudgetPolicy(companyId: string, limits: ReturnType<typeof getConfig>["limits"]): void {
   const company = getCompany(companyId);
   if (!company) return;
-  setPolicy(companyId, "budget.monthly_limit_cents", limits.monthlyBudgetCents, "Company monthly spend ceiling in cents.");
-  setPolicy(companyId, "budget.auto_approve_cents", limits.autoApproveCents, "Spend at or below this is inside delegated authority.");
+  setPolicy(
+    companyId,
+    "budget.annual_limit_cents",
+    limits.annualBudgetCents,
+    "Yearly budget in cents. Measured monthly, adjusted quarterly; never a ceiling.",
+  );
 }

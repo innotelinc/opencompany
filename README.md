@@ -181,8 +181,9 @@ under systemd (`deploy/*.service`, install notes in
 `docs/OPERATIONS.md`). `Dockerfile` and `docker-compose.yml` run the web app and
 worker against a shared `.data` volume. Before exposing this beyond a
 trusted machine: add real authentication, put the worker in a container, set a
-monthly planning figure, and configure a secret store for provider credentials.
-The figure reports spending; it never gates work. See
+yearly budget, and configure a secret store for provider credentials. The budget is
+measured monthly and adjusted quarterly on performance; it records spending and
+never gates work. See
 [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Deploying
@@ -256,8 +257,10 @@ keeps telling the truth when a stream would be blocked by a proxy.
 
 ## Spending as history
 
-The budget is a planning figure. The owner can set it or remove it, and nothing in
-dispatch consults it: no task is stopped, throttled or warned about by it. What is
+The budget is a yearly figure, measured monthly and adjusted quarterly on
+performance. The owner can set it or remove it, and nothing in dispatch consults
+it: no task is stopped, throttled or warned about by it, there is no per-call
+budget, and every task and goal that is set gets completed. What is
 recorded — estimates, token usage and any provider-reported charge — is reported on
 Administration → Spending as daily bars, categories and totals. Paying an external
 party is still an owner approval at any amount.

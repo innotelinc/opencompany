@@ -15,24 +15,24 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; error?: 
 }
 
 /**
- * The owner sets a planning figure, or removes it entirely.
+ * The owner sets the budget, or removes it entirely.
  *
- * It is not a ceiling: no task is stopped, throttled or warned about by this
- * number. Spending is recorded as it happens and reported as history next to
- * this form. What the figure is good for is the comparison: how the month is
- * tracking against the number the owner had in mind.
+ * The budget is yearly. It is measured monthly and adjusted quarterly on
+ * performance, and it is a recording of what was spent — never a ceiling. No
+ * task, goal or plan is stopped by it, and there is no per-call budget.
  */
 export function BudgetSettings({
-  limitCents,
-  autoApproveCents,
+  annualLimitCents,
+  monthSpentCents,
+  quarterSpentCents,
 }: {
-  limitCents: number;
-  autoApproveCents: number;
+  annualLimitCents: number;
+  monthSpentCents: number;
+  quarterSpentCents: number;
 }) {
   const router = useRouter();
-  const [limit, setLimit] = useState(String(limitCents));
-  const [autoApprove, setAutoApprove] = useState(String(autoApproveCents));
-  const [removed, setRemoved] = useState(limitCents <= 0);
+  const [limit, setLimit] = useState(String(annualLimitCents));
+  const [removed, setRemoved] = useState(annualLimitCents <= 0);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -45,17 +45,14 @@ export function BudgetSettings({
       setMessage("Enter a whole number of dollars.");
       return;
     }
-    const result = await post("/api/budget", {
-      monthlyLimitCents: nextLimit,
-      autoApproveCents: Math.max(0, Math.round(Number(autoApprove))),
-    });
+    const result = await post("/api/budget", { annualBudgetCents: nextLimit });
     setBusy(false);
     if (!result.ok) {
       setMessage(result.error ?? "Could not save the figure.");
       return;
     }
     setRemoved(nextLimit <= 0);
-    setMessage(nextLimit <= 0 ? "Figure removed. History keeps recording." : "Saved.");
+    setMessage(nextLimit <= 0 ? "Budget removed. Spend keeps being recorded." : "Saved.");
     startTransition(() => router.refresh());
   }
 
@@ -63,7 +60,7 @@ export function BudgetSettings({
     <div className="stack" style={{ gap: 10, marginBottom: 12 }}>
       <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div className="field" style={{ margin: 0 }}>
-          <label htmlFor="budget-plan">Planning figure (USD / month)</label>
+          <label htmlFor="budget-plan">Budget (USD / year)</label>
           <input
             id="budget-plan"
             type="number"
@@ -75,24 +72,13 @@ export function BudgetSettings({
             onChange={(event) => setLimit(String(Math.round(Number(event.target.value) * 100)))}
           />
         </div>
-        <div className="field" style={{ margin: 0 }}>
-          <label htmlFor="budget-auto">Auto-approve spend up to (USD)</label>
-          <input
-            id="budget-auto"
-            type="number"
-            min={0}
-            step="0.01"
-            value={(Number(autoApprove) / 100).toString()}
-            onChange={(event) => setAutoApprove(String(Math.round(Number(event.target.value) * 100)))}
-          />
-        </div>
         <button
           className="btn primary small"
           type="button"
           disabled={busy || pending || removed}
           onClick={() => save(Math.round(Number(limit)))}
         >
-          {busy ? "Saving…" : "Save figure"}
+          {busy ? "Saving…" : "Save budget"}
         </button>
         <button
           className="btn small"
@@ -100,13 +86,23 @@ export function BudgetSettings({
           disabled={busy || pending || removed}
           onClick={() => save(0)}
         >
-          Remove figure
+          Remove budget
         </button>
-        {removed ? <span className="tiny faint">No figure set — spend is still recorded.</span> : null}
+        {removed ? <span className="tiny faint">No budget set — spend is still recorded.</span> : null}
       </div>
       <p className="tiny faint" style={{ margin: 0 }}>
-        This number never stops work. Paying an external party is still your approval, at any amount.
+        Yearly budget, measured monthly and adjusted quarterly on performance. It never stops work and there is no
+        per-call budget: any task or goal that is set gets completed. Paying an external party is still your approval.
       </p>
+      {removed ? null : (
+        <p className="tiny faint" style={{ margin: 0 }}>
+          This month ${(monthSpentCents / 100).toFixed(2)} recorded of ${
+            (annualLimitCents / 1200).toFixed(2)
+          } on pace · this quarter ${(quarterSpentCents / 100).toFixed(2)} recorded of ${
+            (annualLimitCents / 400).toFixed(2)
+          } on pace.
+        </p>
+      )}
       {message ? <span className="tiny faint">{message}</span> : null}
     </div>
   );
