@@ -6,6 +6,7 @@ import { companyDashboard } from "@/lib/domain/ops";
 import { Badge, Empty, Metric, Panel, Progress, SetupNotice, TaskStatus, relativeTime } from "@/components/ui";
 import { ActionButton, BriefForm, DecisionActions } from "@/components/OwnerConsole";
 import ChatPanel from "@/components/ChatPanel";
+import { ActivityFeed } from "@/components/ActivityFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -201,15 +202,7 @@ export default function BoardroomPage() {
           </Panel>
 
           <Panel title="Activity" hint="Newest first">
-            <div className="timeline">
-              {activity.length === 0 ? <Empty>No activity yet. Submit a brief to start the loop.</Empty> : null}
-              {activity.map((event) => (
-                <div className="timeline-item" key={event.id}>
-                  <div className="when">{relativeTime(event.createdAt)} · {event.actorType}</div>
-                  <div className="what">{event.summary}</div>
-                </div>
-              ))}
-            </div>
+            <ActivityFeed events={activity} />
           </Panel>
 
           <Panel title="Goals" hint={`${goals.length}`}>
