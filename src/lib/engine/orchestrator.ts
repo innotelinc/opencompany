@@ -335,6 +335,11 @@ export function recoverBlockedTasks(companyId: string): string[] {
       !assignee || assignee.authority === "observe" || !assignee.allowedTools.includes(tool);
     const infrastructureBlocked = INFRASTRUCTURE_BLOCKERS.some((pattern) => pattern.test(reason));
 
+    // An empty reason is not automatically a gap: planned work waits blocked for
+    // the owner's approval before it may run, and it carries no reason because
+    // nothing went wrong. Those wait for the decision, not for another attempt,
+    // so they are left alone here and the owner acts on them from the blocked
+    // list instead.
     if (!capabilityBlocked && !infrastructureBlocked) continue;
 
     if (capabilityBlocked) {

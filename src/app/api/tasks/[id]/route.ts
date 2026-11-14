@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/session";
-import { cancelTaskTree, retryTask } from "@/lib/domain/commands";
+import { cancelTaskTree, reassignTask, retryTask } from "@/lib/domain/commands";
 import { getTask } from "@/lib/domain/repo";
 import { fail, ok, readJson, unexpected } from "@/lib/api";
 
@@ -10,7 +10,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const session = getSession();
     const { id } = await context.params;
-    const body = await readJson<{ action?: "cancel" | "retry"; reason?: string }>(request);
+    const body = await readJson<{
+      action?: "cancel" | "retry" | "reassign";
+      reason?: string;
+      employeeId?: string;
+    }>(request);
     const task = getTask(session.company.id, id);
     if (!task) return fail("Task not found in this company.", 404);
 
@@ -25,6 +29,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
     if (body.action === "retry") {
       retryTask({ companyId: session.company.id, taskId: id, actorId: session.owner.id });
+      return ok();
+    }
+    if (body.action === "reassign") {
+      if (!body.employeeId) return fail("Choose the employee who should own this task.");
+      reassignTask({
+        companyId: session.company.id,
+        actorId: session.owner.id,
+        taskId: id,
+        employeeId: body.employeeId,
+      });
       return ok();
     }
     return fail("Unknown task action.");

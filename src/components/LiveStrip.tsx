@@ -99,9 +99,9 @@ export default function LiveStrip() {
             <strong>{counts.completed}</strong> done
           </span>
           {counts.blocked > 0 ? (
-            <span className="live-warn">
+            <a className="live-warn" href="/organization#blocked" title="See what is blocked and unblock it">
               <strong>{counts.blocked}</strong> blocked
-            </span>
+            </a>
           ) : null}
         </span>
       ) : (

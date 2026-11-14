@@ -6,6 +6,7 @@ import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui"
 import { ActionButton } from "@/components/OwnerConsole";
 import { AutonomyControl, FireButton, HireForm, TaskForm } from "@/components/StaffConsole";
 import GoalsPanel from "@/components/GoalsConsole";
+import BlockedPanel from "@/components/BlockedConsole";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,21 @@ export default function OrganizationPage() {
   const goals = listGoals(company.id);
   const departmentName = new Map(departments.map((department) => [department.id, department.name]));
   const employeeName = new Map(employees.map((employee) => [employee.id, employee.name]));
+  const projectName = new Map(projects.map((project) => [project.id, project.name]));
+
+  // Whatever has stopped moving, with the reason it stopped, so it can be acted
+  // on here rather than only noticed in the live strip.
+  const blockedTasks = tasks
+    .filter((task) => task.status === "blocked")
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      reason: task.blockedReason,
+      assigneeName: task.assigneeId ? employeeName.get(task.assigneeId) ?? null : null,
+      projectName: task.projectId ? projectName.get(task.projectId) ?? null : null,
+      attempts: task.attemptCount,
+      since: relativeTime(task.createdAt),
+    }));
 
   // What each goal has actually produced. Tasks follow their project, so a goal's
   // progress is the work of every project pointed at it — no second link to keep
@@ -116,6 +132,15 @@ export default function OrganizationPage() {
       <Panel title="Goals" hint={`${goals.filter((goal) => goal.status === "active").length} active`}>
         <GoalsPanel goals={goalRows} unlinkedProjects={unlinkedProjects} />
       </Panel>
+
+      <div id="blocked">
+        <Panel title="Blocked" hint={blockedTasks.length === 0 ? "nothing stopped" : `${blockedTasks.length} stopped`}>
+          <BlockedPanel
+            tasks={blockedTasks}
+            employees={employees.map((employee) => ({ id: employee.id, name: employee.name }))}
+          />
+        </Panel>
+      </div>
 
       <Panel title="Roster" hint={`${employees.length} people`}>
         {employees.length === 0 ? (

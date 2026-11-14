@@ -186,6 +186,45 @@ export function retryTask(input: { companyId: string; taskId: string; actorId: s
   });
 }
 
+/**
+ * Move work to someone else. A task is often blocked because the person holding
+ * it cannot do it, so handing it to a colleague is the fix that moves it on.
+ */
+export function reassignTask(input: {
+  companyId: string;
+  actorId: string;
+  taskId: string;
+  employeeId: string;
+}): void {
+  const task = getTask(input.companyId, input.taskId);
+  if (!task) throw new Error("Task not found.");
+  if (!["blocked", "pending", "failed"].includes(task.status)) {
+    throw new Error(`Task is ${task.status}; only blocked or queued work can be reassigned.`);
+  }
+  const employee = getEmployee(input.companyId, input.employeeId);
+  if (!employee || employee.terminatedAt) throw new Error("That employee is not on staff.");
+  if (task.assigneeId === employee.id) return;
+
+  updateTask(input.companyId, task.id, {
+    assigneeId: employee.id,
+    status: "pending",
+    blockedReason: null,
+    attemptCount: 0,
+    cancelRequested: false,
+  });
+  recordActivity({
+    companyId: input.companyId,
+    actorType: "human",
+    actorId: input.actorId,
+    type: "task.reassigned",
+    summary: `Owner moved "${task.title}" to ${employee.name} to get it past: ${
+      task.blockedReason?.slice(0, 120) || "no reason recorded"
+    }.`,
+    taskId: task.id,
+    projectId: task.projectId,
+  });
+}
+
 export function haltCompany(input: { companyId: string; actorId: string; reason: string }): {
   cancelledRuns: number;
   inFlightNote: string;
