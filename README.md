@@ -176,7 +176,8 @@ Licensing and upstream attribution: [docs/LICENSING.md](docs/LICENSING.md).
 ## Production notes
 
 `npm run build` is verified. A reference instance runs at
-**http://192.168.1.112:3000** under systemd (`deploy/*.service`, install notes in
+**http://192.168.1.51:3000** on host `i1` (public: https://opencompany.innotel.site)
+under systemd (`deploy/*.service`, install notes in
 `docs/OPERATIONS.md`). `Dockerfile` and `docker-compose.yml` run the web app and
 worker against a shared `.data` volume. Before exposing this beyond a
 trusted machine: add real authentication, put the worker in a container, set a

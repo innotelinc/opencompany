@@ -77,17 +77,18 @@ from server configuration.
 
 ## Reference deployment (LAN server)
 
-A working instance is installed at **http://192.168.1.112:3000** on the Ubuntu
-26.04 host `copilotkit`:
+A working instance is installed at **http://192.168.1.51:3000** on the Ubuntu
+26.04 host `i1` (public: https://opencompany.innotel.site):
 
 | Item | Value |
 |---|---|
-| Code | `/opt/opencompany` (rsync/tar copy, not a git checkout) |
-| Runtime | Node.js 22.23.4 (NodeSource), `build-essential` for the SQLite native build |
+| Code | `/opt/opencompany` (git checkout, auto-deploy timer polls `origin/main`) |
+| Runtime | Node.js 22.23.4 (official tarball in `/usr/local`), `build-essential` for the SQLite native build |
 | Services | `opencompany-web.service`, `opencompany-worker.service` (enabled, restart on failure) |
 | Unit files | `deploy/*.service` in this repository |
 | Data | `/opt/opencompany/.data` (SQLite WAL, workspaces, deliverables) |
-| Admin key | `~/.ssh/authorized_keys` entry for `.data/deploy_key` (gitignored, never commit it) |
+| Deploy key | `/root/.ssh/opencompany_deploy_i1` (read-only GitHub deploy key "i1 auto-deploy") |
+| Auto-deploy | `deploy/install-auto-deploy.sh`, `opencompany-autodeploy.timer` |
 | Backend | `deterministic` — simulated work, no model key, no cost |
 
 Update procedure from a workstation:
@@ -95,14 +96,14 @@ Update procedure from a workstation:
 ```bash
 tar -czf .data/opencompany.tar.gz --exclude=node_modules --exclude=.next \
   --exclude=.data --exclude=.upstream --exclude=.git --exclude=.env .
-scp -i .data/deploy_key .data/opencompany.tar.gz root@192.168.1.112:/tmp/
-ssh -i .data/deploy_key root@192.168.1.112 \
+scp .data/opencompany.tar.gz root@192.168.1.51:/tmp/
+ssh root@192.168.1.51 \
   'tar -xzf /tmp/opencompany.tar.gz -C /opt/opencompany && cd /opt/opencompany \
    && npm ci && npm run build && npm run db:migrate && npm run db:seed \
    && systemctl restart opencompany-web opencompany-worker'
 ```
 
-Health: `curl http://192.168.1.112:3000/api/health` should report `ok: true` and a
+Health: `curl http://192.168.1.51:3000/api/health` should report `ok: true` and a
 worker heartbeat younger than 20 seconds. Logs: `journalctl -u opencompany-web -f`
 and `journalctl -u opencompany-worker -f`.
 
