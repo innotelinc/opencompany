@@ -51,7 +51,8 @@ import { budgetSnapshot, canDispatch, recordSimulatedUsage, reserveEstimate, set
 import { proposeDecision } from "@/lib/domain/decisions";
 import { clearProviderOutage, getProviderHealth, recordProviderOutage } from "@/lib/domain/provider";
 import { evaluateAction } from "@/lib/policy";
-import { ComputerBusyError, EmployeeWorkspace, ensureDir } from "@/lib/computers/workspace";
+import { configureEmployeeBrowser } from "@/lib/computers/employee-browser";
+import { ComputerBusyError, EmployeeWorkspace } from "@/lib/computers/workspace";
 import { persistFiles, readArtifactFiles } from "@/lib/engine/artifacts";
 import { ALL_CHECKS, checksPassed, runChecks } from "@/lib/engine/checks";
 import { DeterministicBackend } from "@/lib/engine/adapters/deterministic";
@@ -100,30 +101,7 @@ function resolveAssignee(companyId: string, name: string): Employee | null {
 
 /** Ensure an employee has a persistent computer row and workspace directory. */
 export function ensureComputer(companyId: string, employee: Employee) {
-  const existing = getComputerForEmployee(companyId, employee.id);
-  const base = getConfig().dataDir;
-  const workspacePath = existing?.workspacePath ?? `${base}/workspaces/${companyId}/${employee.id}`;
-  const profilePath = `${workspacePath}/.browser/profile`;
-  ensureDir(workspacePath);
-  if (!existing) {
-    return getDb()
-      .prepare(
-        `INSERT INTO computers (id, company_id, employee_id, status, workspace_path, browser_status, browser_profile_path, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
-      )
-      .run(
-        newId("cmp"),
-        companyId,
-        employee.id,
-        "stopped",
-        workspacePath,
-        getConfig().limits.browserEnabled ? "available" : "not_configured",
-        profilePath,
-        nowIso(),
-        nowIso(),
-      );
-  }
-  return existing;
+  return configureEmployeeBrowser(companyId, employee).computer;
 }
 
 // ---------------------------------------------------------------------------

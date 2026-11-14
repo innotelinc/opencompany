@@ -1,4 +1,5 @@
 import { addSeconds, getDb, newId, nowIso } from "@/lib/db";
+import { configureEmployeeBrowser } from "@/lib/computers/employee-browser";
 import {
   createEmployee as createEmployeeRecord,
   createGoal,
@@ -409,6 +410,7 @@ export function createCompanyEmployee(input: {
     throw new Error("Authority must be observe, internal or limited_external.");
   }
   const employee = createEmployeeRecord({ ...input, model: null });
+  configureEmployeeBrowser(input.companyId, employee);
   recordActivity({
     companyId: input.companyId,
     actorType: "human",

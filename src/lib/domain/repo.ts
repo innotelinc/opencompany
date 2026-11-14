@@ -328,6 +328,17 @@ export function listDirectReports(companyId: string, managerId: string): Employe
     .map(mapEmployee);
 }
 
+/** Grant one tool to an employee. Returns false when it was already granted. */
+export function grantEmployeeTool(companyId: string, employeeId: string, tool: string): boolean {
+  const employee = getEmployee(companyId, employeeId);
+  if (!employee || employee.allowedTools.includes(tool)) return false;
+  const tools = [...employee.allowedTools, tool];
+  getDb()
+    .prepare("UPDATE employees SET allowed_tools = ?, updated_at = ? WHERE company_id = ? AND id = ?")
+    .run(JSON.stringify(tools), nowIso(), companyId, employeeId);
+  return true;
+}
+
 export function setEmployeeStatus(companyId: string, employeeId: string, status: string): void {
   getDb()
     .prepare("UPDATE employees SET status = ?, updated_at = ? WHERE company_id = ? AND id = ?")
