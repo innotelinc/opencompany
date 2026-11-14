@@ -43,11 +43,13 @@ fi
 # That host's key is restricted to this one command; a five-minute timer there
 # does the same job when this cannot reach it, so neither path is load-bearing.
 if [ -r "$PRUNE_KEY" ]; then
-  if prune_note="$(ssh -i "$PRUNE_KEY" -o BatchMode=yes -o ConnectTimeout=10 \
-    -o StrictHostKeyChecking=accept-new "root@$COOLIFY_HOST" 2>&1)"; then
+  prune_note="$(ssh -i "$PRUNE_KEY" -o BatchMode=yes -o LogLevel=ERROR \
+    -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
+    "root@$COOLIFY_HOST" 2>/dev/null)" || prune_note=""
+  if [ -n "$prune_note" ]; then
     echo "[coolify] prune: $(tail -n1 <<<"$prune_note")"
   else
-    echo "[coolify] could not ask $COOLIFY_HOST to prune; its timer covers it"
+    echo "[coolify] $COOLIFY_HOST did not prune; its own timer covers that"
   fi
 fi
 
