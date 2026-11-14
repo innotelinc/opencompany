@@ -1492,6 +1492,17 @@ export function setPolicy(companyId: string, key: string, value: unknown, descri
     .run(companyId, key, JSON.stringify(value), description, nowIso());
 }
 
+/**
+ * Remove a policy entirely. The app never deletes policies; this exists for the
+ * operator command that retires a row by hand.
+ */
+export function deletePolicy(companyId: string, key: string): boolean {
+  const result = getDb()
+    .prepare("DELETE FROM policies WHERE company_id = ? AND key = ?")
+    .run(companyId, key);
+  return result.changes > 0;
+}
+
 // ---------------------------------------------------------------------------
 // Knowledge
 // ---------------------------------------------------------------------------

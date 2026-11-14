@@ -157,6 +157,23 @@ name and is never silently accepted. Retry it after fixing the prompt or input w
 `npx tsx scripts/retry-blocked.ts`; the owner can approve the newest proposed plan
 with `npx tsx scripts/approve-plan.ts`.
 
+### Changing a policy from the shell
+
+Policy changes made in the app record their own audit entry. When one has to be made
+straight from the shell — retiring a legacy row, correcting a value — use
+`npm run policy` so the change and its entry are written together in one transaction:
+
+```
+npm run policy -- list [<substring>]
+npm run policy -- set budget.annual_limit_cents 1200000 --note "owner's yearly budget"
+npm run policy -- remove budget.monthly_limit_cents --note "retired; yearly budget replaces it"
+```
+
+Values are parsed as JSON when they can be (numbers, `true`/`false`, objects) and kept
+as strings otherwise. Each set or remove writes a `policy.updated` activity event with
+the old and new value, attributed to `system`, so a direct database edit never drops
+out of the history. Removing a key that is not set writes nothing.
+
 ## Public site and browser sessions
 
 The public face of the company is served, read-only and without an owner session, at
