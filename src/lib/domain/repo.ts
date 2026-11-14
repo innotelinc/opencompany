@@ -1,4 +1,4 @@
-import { getDb, newId, nowIso, parseJson } from "@/lib/db";
+import { getDb, newId, nowIso, parseJson, tx } from "@/lib/db";
 import type {
   ActivityEvent,
   Company,
@@ -422,6 +422,50 @@ export function updateGoalStatus(companyId: string, id: string, status: string):
   getDb()
     .prepare("UPDATE goals SET status = ?, completed_at = ? WHERE company_id = ? AND id = ?")
     .run(status, status === "completed" ? nowIso() : null, companyId, id);
+}
+
+/** Edit the goal's own fields. Only what is passed changes; status carries completed_at with it. */
+export function updateGoal(
+  companyId: string,
+  id: string,
+  patch: { title?: string; description?: string; budgetCents?: number; status?: string },
+): void {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  if (patch.title !== undefined) {
+    fields.push("title = ?");
+    values.push(patch.title);
+  }
+  if (patch.description !== undefined) {
+    fields.push("description = ?");
+    values.push(patch.description);
+  }
+  if (patch.budgetCents !== undefined) {
+    fields.push("budget_cents = ?");
+    values.push(Math.max(0, Math.round(patch.budgetCents)));
+  }
+  if (patch.status !== undefined) {
+    fields.push("status = ?");
+    values.push(patch.status);
+    fields.push("completed_at = ?");
+    values.push(patch.status === "completed" ? nowIso() : null);
+  }
+  if (!fields.length) return;
+  getDb()
+    .prepare(`UPDATE goals SET ${fields.join(", ")} WHERE company_id = ? AND id = ?`)
+    .run(...values, companyId, id);
+}
+
+/**
+ * Remove a goal. Projects and reports keep their history: they are detached
+ * rather than deleted, so removing a goal never erases work that was done for it.
+ */
+export function deleteGoal(companyId: string, id: string): void {
+  tx((db) => {
+    db.prepare("UPDATE projects SET goal_id = NULL WHERE company_id = ? AND goal_id = ?").run(companyId, id);
+    db.prepare("UPDATE reports SET goal_id = NULL WHERE company_id = ? AND goal_id = ?").run(companyId, id);
+    db.prepare("DELETE FROM goals WHERE company_id = ? AND id = ?").run(companyId, id);
+  });
 }
 
 export function createProject(input: {

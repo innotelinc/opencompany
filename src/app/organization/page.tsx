@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { tryGetSession } from "@/lib/session";
-import { listDepartments, listEmployees, listFormerEmployees, listProjects, listTasks } from "@/lib/domain/repo";
+import { listDepartments, listEmployees, listFormerEmployees, listGoals, listProjects, listTasks } from "@/lib/domain/repo";
 import { getComputerAutonomy } from "@/lib/computers/autonomy";
 import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
 import { ActionButton } from "@/components/OwnerConsole";
 import { AutonomyControl, FireButton, HireForm, TaskForm } from "@/components/StaffConsole";
+import GoalsPanel from "@/components/GoalsConsole";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default function OrganizationPage() {
   const departments = listDepartments(company.id);
   const projects = listProjects(company.id);
   const tasks = listTasks(company.id);
+  const goals = listGoals(company.id);
   const departmentName = new Map(departments.map((department) => [department.id, department.name]));
   const employeeName = new Map(employees.map((employee) => [employee.id, employee.name]));
 
@@ -77,6 +79,18 @@ export default function OrganizationPage() {
           <span className="hint">{tasks.filter((task) => task.status === "completed").length} completed</span>
         </div>
       </div>
+
+      <Panel title="Goals" hint={`${goals.filter((goal) => goal.status === "active").length} active`}>
+        <GoalsPanel
+          goals={goals.map((goal) => ({
+            id: goal.id,
+            title: goal.title,
+            description: goal.description,
+            status: goal.status,
+            budgetCents: goal.budgetCents,
+          }))}
+        />
+      </Panel>
 
       <Panel title="Roster" hint={`${employees.length} people`}>
         {employees.length === 0 ? (

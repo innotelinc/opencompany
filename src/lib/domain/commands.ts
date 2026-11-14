@@ -2,10 +2,12 @@ import { addSeconds, getDb, newId, nowIso } from "@/lib/db";
 import {
   createEmployee as createEmployeeRecord,
   createGoal,
+  deleteGoal,
   createKnowledgeDoc,
   createTask,
   getCompany,
   getComputerForEmployee,
+  getGoal,
   getEmployee,
   getKnowledgeDoc,
   getTask,
@@ -22,6 +24,7 @@ import {
   setEmployeeStatus,
   terminateEmployeeRecord,
   updateDecision,
+  updateGoal,
   updateKnowledgeDoc,
   updateTask,
 } from "@/lib/domain/repo";
@@ -496,5 +499,101 @@ export function createAdHocTask(input: {
     taskId: task.id,
   });
   return task.id;
+}
+
+/** The statuses a goal can hold. Anything else is a typo, not a state. */
+export const GOAL_STATUSES = ["active", "paused", "completed", "cancelled"] as const;
+export type GoalStatus = (typeof GOAL_STATUSES)[number];
+
+function assertGoalStatus(status: string): asserts status is GoalStatus {
+  if (!(GOAL_STATUSES as readonly string[]).includes(status)) {
+    throw new Error(`Goal status must be one of ${GOAL_STATUSES.join(", ")}.`);
+  }
+}
+
+function ownedGoal(companyId: string, goalId: string) {
+  const goal = getGoal(companyId, goalId);
+  if (!goal) throw new Error("That goal does not belong to this company.");
+  return goal;
+}
+
+export function createOwnerGoal(input: {
+  companyId: string;
+  actorId: string;
+  title: string;
+  description?: string;
+  budgetCents?: number;
+}): string {
+  const title = input.title.trim();
+  if (!title) throw new Error("A goal needs a title.");
+  const goal = createGoal({
+    companyId: input.companyId,
+    title,
+    description: input.description?.trim() ?? "",
+    createdBy: input.actorId,
+    budgetCents: Math.max(0, Math.round(input.budgetCents ?? 0)),
+  });
+  recordActivity({
+    companyId: input.companyId,
+    actorType: "human",
+    actorId: input.actorId,
+    type: "goal.created",
+    summary: `Owner set the goal "${goal.title}".`,
+    payload: { goalId: goal.id },
+  });
+  return goal.id;
+}
+
+export function updateOwnerGoal(input: {
+  companyId: string;
+  actorId: string;
+  goalId: string;
+  title?: string;
+  description?: string;
+  budgetCents?: number;
+  status?: string;
+}): void {
+  const goal = ownedGoal(input.companyId, input.goalId);
+  const title = input.title?.trim();
+  if (title !== undefined && !title) throw new Error("A goal needs a title.");
+  if (input.status !== undefined) assertGoalStatus(input.status);
+  updateGoal(input.companyId, goal.id, {
+    title,
+    description: input.description?.trim(),
+    budgetCents: input.budgetCents,
+    status: input.status,
+  });
+  const changes: string[] = [];
+  if (title !== undefined && title !== goal.title) changes.push(`renamed to "${title}"`);
+  if (input.description !== undefined && input.description.trim() !== goal.description) changes.push("description updated");
+  if (input.budgetCents !== undefined && input.budgetCents !== goal.budgetCents) {
+    changes.push(`budget set to ${Math.max(0, Math.round(input.budgetCents))}¢`);
+  }
+  if (input.status !== undefined && input.status !== goal.status) changes.push(`status ${input.status}`);
+  recordActivity({
+    companyId: input.companyId,
+    actorType: "human",
+    actorId: input.actorId,
+    type: "goal.updated",
+    summary: `Owner changed the goal "${title || goal.title}"${changes.length ? `: ${changes.join(", ")}` : ""}.`,
+    payload: { goalId: goal.id },
+  });
+}
+
+/**
+ * Remove a goal. Work already delivered for it stays: projects and reports are
+ * detached, not deleted.
+ */
+export function deleteOwnerGoal(input: { companyId: string; actorId: string; goalId: string }): void {
+  const goal = ownedGoal(input.companyId, input.goalId);
+  deleteGoal(input.companyId, goal.id);
+  recordActivity({
+    companyId: input.companyId,
+    actorType: "human",
+    actorId: input.actorId,
+    type: "goal.deleted",
+    summary: `Owner removed the goal "${goal.title}". Its projects and reports were kept.`,
+    payload: { goalId: goal.id },
+  });
 }
 
