@@ -500,6 +500,17 @@ export function listProjects(companyId: string): Project[] {
     .map(mapProject);
 }
 
+/**
+ * Point a project at the goal it serves, or at none. Tasks are not touched:
+ * they follow their project, which is what keeps one answer to "why is this
+ * being built?" instead of two that can disagree.
+ */
+export function setProjectGoal(companyId: string, id: string, goalId: string | null): void {
+  getDb()
+    .prepare("UPDATE projects SET goal_id = ?, updated_at = ? WHERE company_id = ? AND id = ?")
+    .run(goalId, nowIso(), companyId, id);
+}
+
 export function updateProjectStatus(companyId: string, id: string, status: string): void {
   getDb()
     .prepare("UPDATE projects SET status = ?, updated_at = ? WHERE company_id = ? AND id = ?")

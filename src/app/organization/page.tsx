@@ -30,6 +30,39 @@ export default function OrganizationPage() {
   const departmentName = new Map(departments.map((department) => [department.id, department.name]));
   const employeeName = new Map(employees.map((employee) => [employee.id, employee.name]));
 
+  // What each goal has actually produced. Tasks follow their project, so a goal's
+  // progress is the work of every project pointed at it — no second link to keep
+  // in sync.
+  const goalRows = goals.map((goal) => {
+    const linkedProjects = projects.filter((project) => project.goalId === goal.id);
+    const linkedIds = new Set(linkedProjects.map((project) => project.id));
+    const goalTasks = tasks.filter((task) => task.projectId !== null && linkedIds.has(task.projectId));
+    return {
+      id: goal.id,
+      title: goal.title,
+      description: goal.description,
+      status: goal.status,
+      budgetCents: goal.budgetCents,
+      tasks: {
+        total: goalTasks.length,
+        completed: goalTasks.filter((task) => task.status === "completed").length,
+      },
+      projectRows: linkedProjects.map((project) => {
+        const own = goalTasks.filter((task) => task.projectId === project.id);
+        return {
+          id: project.id,
+          name: project.name,
+          status: project.status,
+          tasks: own.length,
+          completed: own.filter((task) => task.status === "completed").length,
+        };
+      }),
+    };
+  });
+  const unlinkedProjects = projects
+    .filter((project) => !project.goalId)
+    .map((project) => ({ id: project.id, name: project.name }));
+
   const workload = (employeeId: string) => {
     const owned = tasks.filter((task) => task.assigneeId === employeeId);
     return {
@@ -81,15 +114,7 @@ export default function OrganizationPage() {
       </div>
 
       <Panel title="Goals" hint={`${goals.filter((goal) => goal.status === "active").length} active`}>
-        <GoalsPanel
-          goals={goals.map((goal) => ({
-            id: goal.id,
-            title: goal.title,
-            description: goal.description,
-            status: goal.status,
-            budgetCents: goal.budgetCents,
-          }))}
-        />
+        <GoalsPanel goals={goalRows} unlinkedProjects={unlinkedProjects} />
       </Panel>
 
       <Panel title="Roster" hint={`${employees.length} people`}>

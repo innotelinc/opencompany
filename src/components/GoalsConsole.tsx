@@ -3,12 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+export interface GoalProjectRow {
+  id: string;
+  name: string;
+  status: string;
+  tasks: number;
+  completed: number;
+}
+
 export interface GoalRow {
   id: string;
   title: string;
   description: string;
   status: string;
   budgetCents: number;
+  tasks: { total: number; completed: number };
+  projectRows: GoalProjectRow[];
 }
 
 const STATUSES = ["active", "paused", "completed", "cancelled"] as const;
@@ -30,12 +40,26 @@ function tone(status: string) {
   return "info";
 }
 
+/** How far a goal has got: its completed tasks against all of them. A goal with
+ *  no tasks yet is at zero unless every project serving it is finished. */
+function progressOf(goal: GoalRow): number {
+  if (goal.tasks.total > 0) return Math.round((goal.tasks.completed / goal.tasks.total) * 100);
+  if (goal.projectRows.length > 0 && goal.projectRows.every((project) => project.status === "completed")) return 100;
+  return 0;
+}
+
 /**
- * The owner's own goals, editable in place. A goal is what the CEO plans
- * against, so this is a statement of intent rather than permission: editing one
- * never widens what an employee may do.
+ * The owner's own goals, editable in place, with the work each one has behind it.
+ * A goal is what the CEO plans against, so this is a statement of intent rather
+ * than permission: editing one never widens what an employee may do.
  */
-export default function GoalsPanel({ goals }: { goals: GoalRow[] }) {
+export default function GoalsPanel({
+  goals,
+  unlinkedProjects,
+}: {
+  goals: GoalRow[];
+  unlinkedProjects: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -78,6 +102,15 @@ export default function GoalsPanel({ goals }: { goals: GoalRow[] }) {
     setBusy(goal.id);
     setError(null);
     const result = await send(`/api/goals/${goal.id}`, "DELETE");
+    setBusy(null);
+    if (!result.ok) return setError(result.error);
+    router.refresh();
+  }
+
+  async function assign(projectId: string, goalId: string | null) {
+    setBusy(`project:${projectId}`);
+    setError(null);
+    const result = await send(`/api/projects/${projectId}`, "PATCH", { goalId });
     setBusy(null);
     if (!result.ok) return setError(result.error);
     router.refresh();
@@ -148,7 +181,7 @@ export default function GoalsPanel({ goals }: { goals: GoalRow[] }) {
             onSave={(next) => save(goal, next)}
           />
         ) : (
-          <div key={goal.id} className="panel flat stack" style={{ gap: 6 }}>
+          <div key={goal.id} className="panel flat stack" style={{ gap: 10 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <div style={{ fontFamily: "var(--serif)", fontSize: 16 }}>{goal.title}</div>
@@ -157,6 +190,66 @@ export default function GoalsPanel({ goals }: { goals: GoalRow[] }) {
               </div>
               <span className={`badge ${tone(goal.status)}`}>{goal.status}</span>
             </div>
+
+            <div className="stack" style={{ gap: 6 }}>
+              <div className="progress" role="progressbar" aria-valuenow={progressOf(goal)} aria-valuemin={0} aria-valuemax={100} aria-label={`Progress for ${goal.title}`}>
+                <span style={{ width: `${progressOf(goal)}%` }} />
+              </div>
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="tiny faint">
+                  {goal.tasks.completed} of {goal.tasks.total} task{goal.tasks.total === 1 ? "" : "s"} done ·{" "}
+                  {goal.projectRows.length} project{goal.projectRows.length === 1 ? "" : "s"}
+                </span>
+                <span className="tiny faint">{progressOf(goal)}%</span>
+              </div>
+            </div>
+
+            <div className="stack" style={{ gap: 4 }}>
+              {goal.projectRows.length === 0 ? (
+                <span className="tiny faint">No project serves this goal yet.</span>
+              ) : (
+                goal.projectRows.map((project) => (
+                  <div key={project.id} className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+                    <span className="small">
+                      {project.name}{" "}
+                      <span className="tiny faint">
+                        {project.completed}/{project.tasks} tasks · {project.status}
+                      </span>
+                    </span>
+                    <button
+                      className="btn small ghost"
+                      type="button"
+                      aria-label={`Unlink ${project.name} from ${goal.title}`}
+                      disabled={busy === `project:${project.id}`}
+                      onClick={() => assign(project.id, null)}
+                    >
+                      Unlink
+                    </button>
+                  </div>
+                ))
+              )}
+
+              {unlinkedProjects.length > 0 ? (
+                <select
+                  aria-label={`Link a project to ${goal.title}`}
+                  value=""
+                  disabled={busy !== null}
+                  onChange={(event) => {
+                    const projectId = event.target.value;
+                    if (!projectId) return;
+                    assign(projectId, goal.id);
+                  }}
+                >
+                  <option value="">Link a project to this goal…</option>
+                  {unlinkedProjects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+
             <div className="row">
               <button className="btn small" type="button" disabled={busy === goal.id} onClick={() => setEditing(goal.id)}>
                 Edit

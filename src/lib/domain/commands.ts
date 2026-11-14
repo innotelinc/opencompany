@@ -10,6 +10,7 @@ import {
   getGoal,
   getEmployee,
   getKnowledgeDoc,
+  getProject,
   getTask,
   grantHumanControl,
   listChildTasks,
@@ -20,6 +21,7 @@ import {
   releaseHumanControl,
   requestRunCancellation,
   setCompanyHalted,
+  setProjectGoal,
   setEmployeePaused,
   setEmployeeStatus,
   terminateEmployeeRecord,
@@ -577,6 +579,35 @@ export function updateOwnerGoal(input: {
     type: "goal.updated",
     summary: `Owner changed the goal "${title || goal.title}"${changes.length ? `: ${changes.join(", ")}` : ""}.`,
     payload: { goalId: goal.id },
+  });
+}
+
+/**
+ * Say which goal a project serves. Its tasks inherit the answer, so this is how
+ * the owner's goals come to have progress at all.
+ */
+export function linkOwnerProjectToGoal(input: {
+  companyId: string;
+  actorId: string;
+  projectId: string;
+  goalId: string | null;
+}): void {
+  const project = getProject(input.companyId, input.projectId);
+  if (!project) throw new Error("That project does not belong to this company.");
+  const goal = input.goalId ? ownedGoal(input.companyId, input.goalId) : null;
+  if (goal?.status === "cancelled") throw new Error("A cancelled goal cannot take work.");
+  if ((project.goalId ?? null) === (goal?.id ?? null)) return;
+
+  setProjectGoal(input.companyId, project.id, goal?.id ?? null);
+  recordActivity({
+    companyId: input.companyId,
+    actorType: "human",
+    actorId: input.actorId,
+    type: "project.goal",
+    summary: goal
+      ? `Owner linked the project "${project.name}" to the goal "${goal.title}".`
+      : `Owner unlinked the project "${project.name}" from its goal.`,
+    payload: { projectId: project.id, goalId: goal?.id ?? null },
   });
 }
 
