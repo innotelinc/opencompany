@@ -53,6 +53,24 @@ if [ -r "$PRUNE_KEY" ]; then
   fi
 fi
 
+# GitHub's webhook now queues the build at push time, so by the time the box
+# arrives here that commit is usually already queued, building or deployed.
+# Asking again would build the same commit twice on a host that has little room
+# for one build, so check first and leave the webhook's turn alone.
+HEAD_SHA="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null || true)"
+if [ -n "$HEAD_SHA" ]; then
+  covered="$(curl -sS -m 20 -H "Authorization: Bearer $COOLIFY_TOKEN" \
+    "$COOLIFY_URL/api/v1/deployments?uuid=$COOLIFY_APP_UUID" 2>/dev/null \
+    | tr '}' '\n' \
+    | grep -F "\"commit\":\"$HEAD_SHA\"" \
+    | grep -vE '"status":"(failed|cancelled-by-user|cancelled)"' \
+    | head -1)" || covered=""
+  if [ -n "$covered" ]; then
+    echo "[coolify] $(grep -oE '"status":"[^"]*"' <<<"$covered") already covers $(printf '%s' "$HEAD_SHA" | cut -c1-7); not queueing a second build"
+    exit 0
+  fi
+fi
+
 response="$(curl -sS -m 45 -X POST \
   -H "Authorization: Bearer $COOLIFY_TOKEN" \
   -H 'content-type: application/json' \
