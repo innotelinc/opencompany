@@ -1,12 +1,16 @@
 import type { ActivityEvent } from "@/lib/domain/types";
 import { Badge, Empty, relativeTime } from "@/components/ui";
 
+function dollars(cents: number): string {
+  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /** Cents read as dollars, switches read as on/off, everything else stays literal. */
 function formatValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "not set";
   if (typeof value === "boolean") return value ? "on" : "off";
   if (typeof value === "number") {
-    return key.endsWith("_cents") ? `$${(value / 100).toFixed(2)} (${value}¢)` : String(value);
+    return key.endsWith("_cents") ? `${dollars(value)} (${value}¢)` : String(value);
   }
   if (typeof value === "string") return value;
   return JSON.stringify(value);
