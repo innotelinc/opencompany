@@ -8,8 +8,10 @@ import {
   passwordProblem,
   recentAuthFailures,
   recordAuthFailure,
+  listMemberSessions,
   resolveSessionToken,
   revokeSession,
+  revokeSessionById,
   verifyPassword,
 } from "../src/lib/auth";
 import { closeDb } from "../src/lib/db";
@@ -54,6 +56,24 @@ test("a session token resolves to its member and can be revoked", () => {
   assert.equal(resolveSessionToken(token), null, "a revoked token is dead");
   assert.equal(resolveSessionToken("made-up-token"), null);
   assert.equal(resolveSessionToken(""), null);
+});
+
+test("a session can only be revoked by the member who owns it", () => {
+  const first = createSession({ companyId, memberId: owner.id, userAgent: "browser one" });
+  const second = createSession({ companyId, memberId: owner.id, userAgent: "browser two" });
+  const firstId = resolveSessionToken(first.token)!.id;
+  const secondId = resolveSessionToken(second.token)!.id;
+
+  const listed = listMemberSessions(owner.id).map((session) => session.id);
+  assert.ok(listed.includes(firstId) && listed.includes(secondId), "both browsers are listed");
+
+  assert.equal(revokeSessionById("hum_someone_else", firstId), false, "another member cannot revoke it");
+  assert.ok(listMemberSessions(owner.id).some((session) => session.id === firstId), "and it stays alive");
+
+  assert.equal(revokeSessionById(owner.id, firstId), true);
+  assert.ok(!listMemberSessions(owner.id).some((session) => session.id === firstId));
+  assert.equal(resolveSessionToken(first.token), null, "the revoked token stops resolving");
+  assert.ok(resolveSessionToken(second.token), "the other browser is untouched");
 });
 
 test("failed sign-ins are counted and can be cleared", () => {

@@ -126,6 +126,39 @@ export function resolveSessionToken(token: string): ResolvedSession | null {
   };
 }
 
+export interface MemberSession {
+  id: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  userAgent: string | null;
+}
+
+/** The browsers currently signed in as this person, newest activity first. */
+export function listMemberSessions(memberId: string): MemberSession[] {
+  return getDb()
+    .prepare(
+      `SELECT id, created_at, last_seen_at, expires_at, user_agent FROM auth_sessions
+       WHERE human_member_id = ? AND expires_at > ? ORDER BY last_seen_at DESC`,
+    )
+    .all(memberId, new Date().toISOString())
+    .map((r: any) => ({
+      id: r.id,
+      createdAt: r.created_at,
+      lastSeenAt: r.last_seen_at,
+      expiresAt: r.expires_at,
+      userAgent: r.user_agent,
+    }));
+}
+
+/** Revoke one of this person's sessions. Scoped by member, so an id alone is not enough. */
+export function revokeSessionById(memberId: string, sessionId: string): boolean {
+  const result = getDb()
+    .prepare("DELETE FROM auth_sessions WHERE human_member_id = ? AND id = ?")
+    .run(memberId, sessionId);
+  return result.changes > 0;
+}
+
 export function revokeSession(token: string): void {
   if (!token) return;
   getDb().prepare("DELETE FROM auth_sessions WHERE token_hash = ?").run(hashToken(token));
