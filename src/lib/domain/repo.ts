@@ -903,10 +903,10 @@ export function recordActivity(input: {
     );
 }
 
-export function listActivity(companyId: string, limit = 60): ActivityEvent[] {
+export function listActivity(companyId: string, limit = 60, offset = 0): ActivityEvent[] {
   return getDb()
-    .prepare("SELECT * FROM activity_events WHERE company_id = ? ORDER BY created_at DESC LIMIT ?")
-    .all(companyId, limit)
+    .prepare("SELECT * FROM activity_events WHERE company_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    .all(companyId, limit, offset)
     .map((r: any) => ({
       id: r.id,
       companyId: r.company_id,

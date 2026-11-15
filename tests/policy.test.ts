@@ -3,7 +3,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getConfig } from "../src/lib/config";
 import { actionHash } from "../src/lib/db";
-import { addLedgerEntry, getExternalAction, listDecisions, listExternalActions, listEmployees } from "../src/lib/domain/repo";
+import {
+  addLedgerEntry,
+  getExternalAction,
+  listActivity,
+  listDecisions,
+  listExternalActions,
+  listEmployees,
+  recordActivity,
+} from "../src/lib/domain/repo";
 import { proposeDecision, approveDecision, rejectDecision } from "../src/lib/domain/decisions";
 import { canDispatch, quarterReview } from "../src/lib/domain/budget";
 import { activityView } from "../src/lib/domain/activity-view";
@@ -91,6 +99,18 @@ test("real spending needs the owner; virtual budget never blocks", () => {
   assert.equal(removed.ok, true);
   assert.equal(removed.snapshot.unlimited, true);
   assert.equal(removed.snapshot.monthlyGuideCents, 0);
+});
+
+test("activity pages back through the trail without overlapping", () => {
+  for (let index = 0; index < 5; index += 1) {
+    recordActivity({ companyId, actorType: "system", type: "test.paging", summary: `paging ${index}` });
+  }
+  const first = listActivity(companyId, 2, 0).map((event) => event.summary);
+  const second = listActivity(companyId, 2, 2).map((event) => event.summary);
+  const third = listActivity(companyId, 2, 4).map((event) => event.summary);
+  assert.equal(first.length, 2, "a page is as long as asked for");
+  assert.equal(second.length, 2);
+  assert.equal(new Set([...first, ...second, ...third]).size, 5, "pages walk back, never repeat an event");
 });
 
 test("an activity view carries the byline and the formatted policy values", () => {
