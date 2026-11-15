@@ -58,6 +58,7 @@ import { ALL_CHECKS, checksPassed, runChecks } from "@/lib/engine/checks";
 import { DeterministicBackend } from "@/lib/engine/adapters/deterministic";
 import { LlmBackend, ProviderUnavailableError, RunStoppedError } from "@/lib/engine/adapters/llm";
 import { approvedExternalActions, executeExternalAction, recoverStaleExternalActions } from "@/lib/engine/external";
+import { deploymentTargetLabel } from "@/lib/engine/deploy-target";
 import type { AgentRunResult, PlanProposal } from "@/lib/engine/types";
 import type { Company, Employee, Goal, Project, Task, TaskRun } from "@/lib/domain/types";
 
@@ -1264,7 +1265,6 @@ function handleReview(input: {
 // ---------------------------------------------------------------------------
 
 function requestDeploymentDecision(companyId: string, reviewed: Task, deliverableId: string, version: number) {
-  const project = reviewed.projectId ? getProject(companyId, reviewed.projectId) : null;
   const deliverable = getDeliverableForTask(companyId, reviewed.id);
   if (!deliverable) return;
   const manifest = latestDeliverableVersion(companyId, deliverableId)?.manifest ?? [];
@@ -1275,10 +1275,7 @@ function requestDeploymentDecision(companyId: string, reviewed: Task, deliverabl
     .get(companyId, reviewed.projectId);
   if (existing) return;
 
-  const target = `${project?.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "customer-site"}.example.test`;
+  const target = deploymentTargetLabel(deliverable.name === PUBLIC_SITE_DELIVERABLE_NAME);
 
   proposeDecision({
     companyId,
