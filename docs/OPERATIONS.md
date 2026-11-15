@@ -115,16 +115,19 @@ not on the wire in clear.
 One human signs in: the company's owner, whose email is `OPENCOMPANY_OWNER_EMAIL`.
 There is no self-service registration and no second role yet.
 
-Set or reset the password on the server:
+While signed in, Administration → Password changes it: it asks for the current
+password, refuses one under 10 characters, and signs other browsers out while keeping
+the one you typed it in. To set or reset it without signing in — the first time, or
+after a lockout — use the server:
 
 ```
 npm run auth:password -- owner@example.com                  # prompts for the password
 npm run auth:password -- owner@example.com --password-file /root/pw   # or from a file
 ```
 
-It stores a salted scrypt hash, never the password, and revokes that person's other
-sessions so a reset also signs other browsers out. Seeding creates the owner without
-a password, so a fresh database cannot be signed into until this is run.
+Either way only a salted scrypt hash is stored, never the password, and other
+sessions are revoked. Seeding creates the owner without a password, so a fresh
+database cannot be signed into until one of these is used.
 
 A session is a random 32-byte token in an `HttpOnly`, `SameSite=Lax` cookie, valid for
 30 days, and the database keeps only its SHA-256. Signing out deletes the row. Every

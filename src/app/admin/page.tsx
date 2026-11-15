@@ -18,6 +18,7 @@ import { Badge, Empty, Panel, relativeTime } from "@/components/ui";
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
 import { BudgetSettings, QuarterReview, SiteProbeButton, SpendHistory } from "@/components/BudgetControls";
 import { SessionList } from "@/components/SessionList";
+import { PasswordForm } from "@/components/PasswordForm";
 import { listMemberSessions } from "@/lib/auth";
 import { spendAnalytics } from "@/lib/domain/analytics";
 import { lastProbe, publicSiteUrl } from "@/lib/public-site/uptime";
@@ -163,6 +164,10 @@ export default async function AdministrationPage() {
 
       <Panel title={`Quarterly review · ${review.year}`} hint="Each quarter against a quarter of the yearly budget">
         <QuarterReview review={review} />
+      </Panel>
+
+      <Panel title="Password" hint="Change it without a shell">
+        <PasswordForm />
       </Panel>
 
       <Panel title="Sessions" hint={`${sessions.length} signed in`}>
