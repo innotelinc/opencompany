@@ -174,6 +174,37 @@ as strings otherwise. Each set or remove writes a `policy.updated` activity even
 the old and new value, attributed to `system`, so a direct database edit never drops
 out of the history. Removing a key that is not set writes nothing.
 
+## Reading the activity trail
+
+`GET /api/activity` returns the company's activity, newest first, in the shape the
+Activity panel renders: each row has `byline` ("5m ago · system") and `text`, and a
+policy change also carries `policy` with `key`, `from`, `to` and `note` — the same
+formatted values shown on the page. The response also includes `runEvents`, `worker`
+and `halted`.
+
+Page size is `?limit=`, 1–500, default 40. There are two ways to go further back:
+
+| mode | request | when to use it |
+| --- | --- | --- |
+| cursor | `?limit=50&cursor=<nextCursor>` | Preferred. Events landing between calls cannot shift the window, so nothing repeats or is missed. |
+| offset | `?limit=50&offset=50` | Simple, and fine for a quick look. The window moves as events land, so a long walk can repeat or skip a row. |
+
+A page carries `nextCursor` while older history exists and `null` on the last page;
+`nextOffset` is the offset equivalent and is `null` when paging by cursor. The cursor
+is opaque — pass back exactly what you were given. Its readable form is
+`?before=<ISO>&beforeId=<event id>`, matching the `nextBefore` and `nextBeforeId`
+fields. Ordering is by `(created_at, id)`, so several events written in the same
+millisecond cannot repeat or vanish.
+
+```
+curl -s 'https://opencompany.innotel.site/api/activity?limit=20'
+curl -s 'https://opencompany.innotel.site/api/activity?limit=20&cursor=<nextCursor>'
+```
+
+Bad input comes back as a 400 with a reason: a `limit` outside 1–500, a negative
+`offset`, a cursor this endpoint did not issue, or a `before` that is not an ISO
+timestamp.
+
 ## Public site and browser sessions
 
 The public face of the company is served, read-only and without an owner session, at
