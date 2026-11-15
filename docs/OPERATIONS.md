@@ -315,6 +315,12 @@ launching Chromium and rendering a page; the server deploy currently has
 
 ## Publishing through Coolify
 
+A deliverable keeps **one** publish decision. A standing approval covers the
+class, so the first pass records the decision and every later pass queues only its
+own version under it (`deploy.queued` in the feed) instead of proposing v1, v2, v3…
+A decision the owner made by hand covers exactly the version they reviewed, and a
+pending one waits for them.
+
 `deployment_package` publishes an owner-approved deliverable through Coolify's
 REST API on `deploy.innotel.us`; no CLI is needed at runtime. Set these on the
 worker's host (never in the browser or a tracked file):

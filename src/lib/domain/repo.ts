@@ -1345,6 +1345,26 @@ export function getDecision(companyId: string, id: string): Decision | null {
   return r ? mapDecision(r) : null;
 }
 
+/**
+ * The deployment decision that still stands for a deliverable, if there is one.
+ *
+ * Scoped by the deliverable rather than the project: the company's own site has no
+ * project, and a `project_id = ?` comparison never matches a NULL, which is how every
+ * pass ended up with its own decision.
+ */
+export function findDeployDecision(companyId: string, deliverableId: string): Decision | null {
+  const r = getDb()
+    .prepare(
+      `SELECT * FROM decisions
+        WHERE company_id = ? AND kind = 'public_deploy'
+          AND status IN ('pending','approved','auto_approved')
+          AND json_extract(action_json, '$.deliverableId') = ?
+        ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(companyId, deliverableId);
+  return r ? mapDecision(r) : null;
+}
+
 export function listDecisions(companyId: string, status?: string): Decision[] {
   const db = getDb();
   return (status

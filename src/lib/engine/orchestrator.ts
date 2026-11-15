@@ -10,6 +10,8 @@ import {
   createTask,
   getCompany,
   getComputerForEmployee,
+  createExternalAction,
+  findDeployDecision,
   getDeliverableByName,
   getDeliverableForTask,
   getDeliverableForReviewedTask,
@@ -59,6 +61,7 @@ import { DeterministicBackend } from "@/lib/engine/adapters/deterministic";
 import { LlmBackend, ProviderUnavailableError, RunStoppedError } from "@/lib/engine/adapters/llm";
 import { approvedExternalActions, executeExternalAction, recoverStaleExternalActions } from "@/lib/engine/external";
 import { deploymentTargetLabel } from "@/lib/engine/deploy-target";
+import { planDeployDecision } from "@/lib/engine/deploy-decision";
 import type { AgentRunResult, PlanProposal } from "@/lib/engine/types";
 import type { Company, Employee, Goal, Project, Task, TaskRun } from "@/lib/domain/types";
 
@@ -1268,14 +1271,46 @@ function requestDeploymentDecision(companyId: string, reviewed: Task, deliverabl
   const deliverable = getDeliverableForTask(companyId, reviewed.id);
   if (!deliverable) return;
   const manifest = latestDeliverableVersion(companyId, deliverableId)?.manifest ?? [];
-  const existing = getDb()
-    .prepare(
-      "SELECT id FROM decisions WHERE company_id = ? AND project_id = ? AND kind = 'public_deploy' AND status IN ('pending','approved')",
-    )
-    .get(companyId, reviewed.projectId);
-  if (existing) return;
-
   const target = deploymentTargetLabel(deliverable.name === PUBLIC_SITE_DELIVERABLE_NAME);
+  // The action describes publishing this deliverable, not one version of it: a
+  // standing approval then covers every later pass, and its hash stays the same.
+  const action = {
+    kind: "public_deploy",
+    externalKind: "deployment_package",
+    projectId: reviewed.projectId,
+    deliverableId,
+    target,
+  };
+
+  const standing = findDeployDecision(companyId, deliverableId);
+  const plan = planDeployDecision(standing);
+  if (plan === "wait") return;
+
+  if (plan === "reuse" && standing) {
+    // A standing approval already allows publishing this deliverable. One decision
+    // stays in the list; each pass queues only its own version under it.
+    createExternalAction({
+      companyId,
+      decisionId: standing.id,
+      taskId: reviewed.id,
+      kind: "deployment_package",
+      target,
+      payload: { ...action, version, manifest, files: manifest.length },
+      actionHash: standing.actionHash,
+      idempotencyKey: `decision:${standing.id}:v${version}`,
+      status: "approved",
+    });
+    recordActivity({
+      companyId,
+      actorType: "system",
+      type: "deploy.queued",
+      summary: `${deliverable.name} v${version} queued for ${target} under the standing approval.`,
+      taskId: reviewed.id,
+      projectId: reviewed.projectId,
+      payload: { decisionId: standing.id, version },
+    });
+    return;
+  }
 
   proposeDecision({
     companyId,
@@ -1283,19 +1318,10 @@ function requestDeploymentDecision(companyId: string, reviewed: Task, deliverabl
     taskId: reviewed.id,
     projectId: reviewed.projectId,
     kind: "public_deploy",
-    title: `Publish "${deliverable.name}" v${version} to ${target}`,
+    title: `Publish "${deliverable.name}" to ${target}`,
     businessReason:
       "The deliverable passed automated checks and independent review. Publishing makes it publicly reachable, which needs the owner's explicit approval.",
-    action: {
-      kind: "public_deploy",
-      externalKind: "deployment_package",
-      projectId: reviewed.projectId,
-      deliverableId,
-      version,
-      target,
-      manifest,
-      files: manifest.length,
-    },
+    action,
     risk: "high",
   });
   recordActivity({
