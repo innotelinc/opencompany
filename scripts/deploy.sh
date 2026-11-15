@@ -74,6 +74,11 @@ deploy() {
     npm ci --no-audit --no-fund
   fi
 
+  # Migrations are additive and idempotent; running them before the build means the
+  # new code never starts against an old schema.
+  echo "[deploy] migrating"
+  npm run db:migrate
+
   echo "[deploy] building"
   npm run build
 

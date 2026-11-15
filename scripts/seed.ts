@@ -240,6 +240,7 @@ export function seedCompany(options: { reset?: boolean } = {}) {
   ensurePublicSiteFoundation(companyId);
   console.log(`Seeded company "${config.companySlug}" (${companyId}) with ${listEmployees(companyId).length} AI employees.`);
   console.log(`Owner: ${config.ownerEmail}`);
+  console.log(`Set the sign-in password with: npm run auth:password -- ${config.ownerEmail}`);
   void db;
   return companyId;
 }

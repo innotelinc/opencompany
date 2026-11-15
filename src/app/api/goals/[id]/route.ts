@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const { id } = await context.params;
     if (!getGoal(session.company.id, id)) return fail("Goal not found in this company.", 404);
 
@@ -37,7 +37,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const { id } = await context.params;
     if (!getGoal(session.company.id, id)) return fail("Goal not found in this company.", 404);
     deleteOwnerGoal({ companyId: session.company.id, actorId: session.owner.id, goalId: id });

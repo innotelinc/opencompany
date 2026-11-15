@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { tryGetSession } from "@/lib/session";
 import { getComputerForEmployee, getEmployee, listActivity, listRunEvents, listRuns, listTasks } from "@/lib/domain/repo";
 import { getComputerAutonomy, COMPUTER_AUTONOMY_COPY } from "@/lib/computers/autonomy";
 import { browserAvailability } from "@/lib/computers/browser";
 import { humanHoldsControl } from "@/lib/domain/repo";
-import { Badge, Empty, Panel, SetupNotice, TaskStatus, relativeTime } from "@/components/ui";
+import { Badge, Empty, Panel, TaskStatus, relativeTime } from "@/components/ui";
 import { ActionButton } from "@/components/OwnerConsole";
 import { AutonomyControl, FireButton, TaskForm } from "@/components/StaffConsole";
 
@@ -59,8 +59,8 @@ export default async function ComputerPage({
   params: Promise<{ employeeId: string }>;
   searchParams: Promise<{ file?: string }>;
 }) {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company } = session;
   const { employeeId } = await params;
   const { file } = await searchParams;

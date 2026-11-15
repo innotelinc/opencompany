@@ -1,10 +1,11 @@
+import { redirect } from "next/navigation";
 import fs from "node:fs";
 import Link from "next/link";
 import { tryGetSession } from "@/lib/session";
 import { humanHoldsControl, listActivity, listComputers, listEmployees } from "@/lib/domain/repo";
 import { browserAvailability } from "@/lib/computers/browser";
 import { getComputerAutonomy } from "@/lib/computers/autonomy";
-import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
+import { Badge, Empty, Panel, relativeTime } from "@/components/ui";
 import { AutonomyControl } from "@/components/StaffConsole";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +24,9 @@ function countFiles(root: string): number {
   return count;
 }
 
-export default function ComputersPage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+export default async function ComputersPage() {
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company } = session;
   const employees = listEmployees(company.id);
   const computers = listComputers(company.id);

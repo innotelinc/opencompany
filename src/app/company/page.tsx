@@ -1,15 +1,16 @@
+import { redirect } from "next/navigation";
 import { tryGetSession } from "@/lib/session";
 import { getConfig } from "@/lib/config";
 import { listDepartments, listEmployees } from "@/lib/domain/repo";
 import { getPositions } from "@/lib/domain/setup";
-import { Badge, Panel, SetupNotice } from "@/components/ui";
+import { Badge, Panel } from "@/components/ui";
 import { CompanyIdentityForm, DepartmentManager, PositionEditor, WorkTitleEditor } from "@/components/CompanySetup";
 
 export const dynamic = "force-dynamic";
 
-export default function CompanySetupPage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+export default async function CompanySetupPage() {
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company } = session;
   const employees = listEmployees(company.id);
   const departments = listDepartments(company.id);

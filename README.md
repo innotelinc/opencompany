@@ -162,8 +162,9 @@ Licensing and upstream attribution: [docs/LICENSING.md](docs/LICENSING.md).
 
 **Not built (deliberate gaps for this version)**
 
-- Multi-user sign-in. One owner is resolved on the server from configuration;
-  all queries are company-scoped, but there is no auth provider yet.
+- Multi-user accounts. One owner signs in with a password (`npm run auth:password`),
+  sessions live in the database and every query is company-scoped, but there are no
+  invitations, roles or an external identity provider yet.
 - Real public deployment, email or payments. Adapters return a clear `blocked`
   state; nothing is sent or published.
 - Browser sessions require optional Playwright and are off by default.
@@ -180,7 +181,7 @@ Licensing and upstream attribution: [docs/LICENSING.md](docs/LICENSING.md).
 under systemd (`deploy/*.service`, install notes in
 `docs/OPERATIONS.md`). `Dockerfile` and `docker-compose.yml` run the web app and
 worker against a shared `.data` volume. Before exposing this beyond a
-trusted machine: add real authentication, put the worker in a container, set a
+trusted machine: put TLS in front, set the owner password, put the worker in a container, set a
 yearly budget, and configure a secret store for provider credentials. The budget is
 measured monthly and adjusted quarterly on performance; it records spending and
 never gates work. See

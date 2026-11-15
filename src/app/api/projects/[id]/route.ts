@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  */
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const { id } = await context.params;
     if (!getProject(session.company.id, id)) return fail("Project not found in this company.", 404);
 

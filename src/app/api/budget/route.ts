@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = getSession();
+    const session = await getSession();
     const policies = getPolicies(session.company.id);
     return ok({ budget: budgetSnapshot(session.company.id, policies) });
   } catch (error) {
@@ -26,7 +26,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const body = await readJson<{ annualBudgetCents?: number | null; monthlyLimitCents?: number | null }>(
       request,
     );

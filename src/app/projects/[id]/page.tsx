@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { tryGetSession } from "@/lib/session";
 import {
   getProject,
@@ -12,14 +12,14 @@ import {
   listRuns,
   listTasks,
 } from "@/lib/domain/repo";
-import { Badge, Empty, Panel, SetupNotice, TaskStatus, relativeTime } from "@/components/ui";
+import { Badge, Empty, Panel, TaskStatus, relativeTime } from "@/components/ui";
 import { ActionButton } from "@/components/OwnerConsole";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { id } = await params;
   const project = getProject(session.company.id, id);
   if (!project) notFound();

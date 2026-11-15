@@ -1,6 +1,7 @@
+import { redirect } from "next/navigation";
 import { tryGetSession } from "@/lib/session";
 import { listDecisions, listEmployees } from "@/lib/domain/repo";
-import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
+import { Badge, Empty, Panel, relativeTime } from "@/components/ui";
 import { DecisionActions, StandingApprovalForm } from "@/components/OwnerConsole";
 import { getStandingApproval } from "@/lib/domain/autonomy";
 
@@ -15,9 +16,9 @@ const TONES: Record<string, "ok" | "warn" | "bad" | "info" | "default"> = {
   pending: "warn",
 };
 
-export default function DecisionsPage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+export default async function DecisionsPage() {
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company, owner } = session;
   const decisions = listDecisions(company.id);
   const pending = decisions.filter((decision) => decision.status === "pending");

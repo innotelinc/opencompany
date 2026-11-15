@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = getSession();
+    const session = await getSession();
     return ok({ approval: getStandingApproval(session.company.id) });
   } catch (error) {
     return unexpected(error);
@@ -25,7 +25,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const body = await readJson<{
       action?: "grant" | "revoke";
       kinds?: string[];

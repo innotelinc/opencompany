@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     );
   }
   try {
-    getSession();
+    await getSession();
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error), 503);
   }

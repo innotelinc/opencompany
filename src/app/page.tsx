@@ -1,18 +1,19 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { tryGetSession } from "@/lib/session";
 import { liveModelConfigured, getConfig } from "@/lib/config";
 import { listActivity, listDecisions, listGoals, listReports } from "@/lib/domain/repo";
 import { companyDashboard } from "@/lib/domain/ops";
-import { Badge, Empty, Metric, Panel, Progress, SetupNotice, TaskStatus, relativeTime } from "@/components/ui";
+import { Badge, Empty, Metric, Panel, Progress, TaskStatus, relativeTime } from "@/components/ui";
 import { ActionButton, BriefForm, DecisionActions } from "@/components/OwnerConsole";
 import ChatPanel from "@/components/ChatPanel";
 import { ActivityFeed } from "@/components/ActivityFeed";
 
 export const dynamic = "force-dynamic";
 
-export default function BoardroomPage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+export default async function BoardroomPage() {
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company, owner } = session;
   const goals = listGoals(company.id);
   const pending = listDecisions(company.id, "pending");

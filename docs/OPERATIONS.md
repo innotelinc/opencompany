@@ -106,8 +106,35 @@ Health: `curl http://192.168.1.51:3000/api/health` should report `ok: true` and 
 worker heartbeat younger than 20 seconds. Logs: `journalctl -u opencompany-web -f`
 and `journalctl -u opencompany-worker -f`.
 
-This host is reachable on the LAN without authentication — keep it on the trusted
-network segment until real sign-in is implemented.
+The console requires sign-in. Set the owner password before handing the host over
+(see Signing in), and serve it over TLS so the password and the session cookie are
+not on the wire in clear.
+
+## Signing in
+
+One human signs in: the company's owner, whose email is `OPENCOMPANY_OWNER_EMAIL`.
+There is no self-service registration and no second role yet.
+
+Set or reset the password on the server:
+
+```
+npm run auth:password -- owner@example.com                  # prompts for the password
+npm run auth:password -- owner@example.com --password-file /root/pw   # or from a file
+```
+
+It stores a salted scrypt hash, never the password, and revokes that person's other
+sessions so a reset also signs other browsers out. Seeding creates the owner without
+a password, so a fresh database cannot be signed into until this is run.
+
+A session is a random 32-byte token in an `HttpOnly`, `SameSite=Lax` cookie, valid for
+30 days, and the database keeps only its SHA-256. Signing out deletes the row. Every
+page redirects to `/signin` without one, every API route answers 401, and any
+state-changing request from another origin is refused with 403 — including sign-in.
+Failed sign-ins are counted per address and email; after five in fifteen minutes the
+account's address is answered 429 until the window passes.
+
+`/api/health`, `/api/public-site/health`, `/site` and `/signin` stay reachable
+without a session, because monitors and the public site need them.
 
 ## Recovery and incidents
 
@@ -131,7 +158,8 @@ network segment until real sign-in is implemented.
 
 ## Security checklist before real use
 
-1. Add real sign-in and replace the configuration-resolved owner session.
+1. Put TLS in front of the app, and rotate the owner password with
+   `npm run auth:password -- <email>` (which also signs other browsers out).
 2. Run the worker in a container with resource and network limits.
 3. Use a secret manager for provider keys; rotate them outside the repo.
 4. Set a realistic yearly budget. It is measured monthly and reviewed quarterly on performance; it never stops work.
@@ -187,12 +215,14 @@ empty, so the field validation reports what is missing.
 
 ### Who a request is
 
-There is no login yet. Each route calls `getSession()`, which resolves the company
-and owner from configuration on the server — never from a header or a body — and
-every query is filtered by that company id. That means any client that can reach the
-port is the owner: keep this behind the LAN or the reverse proxy, and do not expose
-`/api` to the internet until real sign-in is added (see the security checklist).
-There is no CSRF token for the same reason.
+A request is whoever holds the session cookie. Each route calls `await getSession()`,
+which reads the `oc_session` token, resolves it to a human member and company in the
+database, and filters every query by that company id — never by a header or body.
+Without a live session the call throws and the route answers 401; pages redirect to
+`/signin`. State-changing requests from another origin are refused with 403 by the
+middleware, so the cookie alone is not enough to drive the API from a third-party
+page. The only routes reachable signed out are `/api/health` and
+`/api/public-site/health` (plus `/site` and the sign-in endpoints).
 
 ### Reading
 

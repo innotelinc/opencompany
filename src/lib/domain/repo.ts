@@ -246,6 +246,44 @@ export function listCompanies(): Company[] {
   return getDb().prepare("SELECT * FROM companies ORDER BY created_at").all().map(mapCompany);
 }
 
+function mapHumanMember(r: any): HumanMember {
+  return {
+    id: r.id,
+    companyId: r.company_id,
+    name: r.name,
+    email: r.email,
+    role: r.role,
+    authority: r.authority,
+  };
+}
+
+export function getHumanMember(id: string): HumanMember | null {
+  const r = getDb().prepare("SELECT * FROM human_members WHERE id = ?").get(id);
+  return r ? mapHumanMember(r) : null;
+}
+
+export function getHumanMemberByEmail(companyId: string, email: string): HumanMember | null {
+  const r = getDb()
+    .prepare("SELECT * FROM human_members WHERE company_id = ? AND lower(email) = lower(?) LIMIT 1")
+    .get(companyId, email.trim());
+  return r ? mapHumanMember(r) : null;
+}
+
+/** The stored scrypt hash, never the password. */
+export function getPasswordHash(memberId: string): string | null {
+  const r = getDb().prepare("SELECT password_hash FROM human_members WHERE id = ?").get(memberId) as
+    | { password_hash: string | null }
+    | undefined;
+  return r?.password_hash ?? null;
+}
+
+export function setPasswordHash(memberId: string, hash: string): boolean {
+  const result = getDb()
+    .prepare("UPDATE human_members SET password_hash = ? WHERE id = ?")
+    .run(hash, memberId);
+  return result.changes > 0;
+}
+
 export function getOwner(companyId: string): HumanMember {
   const r = getDb()
     .prepare("SELECT * FROM human_members WHERE company_id = ? ORDER BY created_at LIMIT 1")

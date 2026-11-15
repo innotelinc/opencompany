@@ -1,8 +1,9 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { tryGetSession } from "@/lib/session";
 import { listDepartments, listEmployees, listFormerEmployees, listGoals, listProjects, listTasks } from "@/lib/domain/repo";
 import { getComputerAutonomy } from "@/lib/computers/autonomy";
-import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
+import { Badge, Empty, Panel, relativeTime } from "@/components/ui";
 import { ActionButton } from "@/components/OwnerConsole";
 import { AutonomyControl, FireButton, HireForm, TaskForm } from "@/components/StaffConsole";
 import GoalsPanel from "@/components/GoalsConsole";
@@ -18,9 +19,9 @@ const AUTHORITY_COPY: Record<string, string> = {
 
 const OPEN_STATUSES = ["pending", "running", "awaiting_review", "blocked", "awaiting_approval"];
 
-export default function OrganizationPage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+export default async function OrganizationPage() {
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company } = session;
   const employees = listEmployees(company.id);
   const former = listFormerEmployees(company.id);

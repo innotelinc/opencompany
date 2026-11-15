@@ -1,13 +1,14 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { tryGetSession } from "@/lib/session";
 import { listDeliverables, listEmployees, listGoals, listProjects, listTasks } from "@/lib/domain/repo";
-import { Badge, Empty, Panel, SetupNotice, TaskStatus } from "@/components/ui";
+import { Badge, Empty, Panel, TaskStatus } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export default function ProjectsPage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+export default async function ProjectsPage() {
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company } = session;
   const projects = listProjects(company.id);
   const tasks = listTasks(company.id);

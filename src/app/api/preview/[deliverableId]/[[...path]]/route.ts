@@ -29,7 +29,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ deliverableId: string; path?: string[] }> },
 ) {
-  const session = getSession();
+  const session = await getSession();
   const { deliverableId, path: segments } = await context.params;
   const deliverable = getDeliverable(session.company.id, deliverableId);
   if (!deliverable) return new Response("Not found", { status: 404 });

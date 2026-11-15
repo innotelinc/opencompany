@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { tryGetSession } from "@/lib/session";
 import { getConfig, liveModelConfigured } from "@/lib/config";
 import {
@@ -13,7 +14,7 @@ import { getPolicies } from "@/lib/domain/repo";
 import { workerStatus } from "@/lib/domain/ops";
 import { getProviderHealth } from "@/lib/domain/provider";
 import { ALL_CHECKS, checkDescription } from "@/lib/engine/checks";
-import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
+import { Badge, Empty, Panel, relativeTime } from "@/components/ui";
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
 import { BudgetSettings, QuarterReview, SiteProbeButton, SpendHistory } from "@/components/BudgetControls";
 import { spendAnalytics } from "@/lib/domain/analytics";
@@ -23,8 +24,8 @@ import { deploymentFeed } from "@/lib/domain/deployments";
 export const dynamic = "force-dynamic";
 
 export default async function AdministrationPage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company } = session;
   const config = getConfig();
   const employees = listEmployees(company.id);

@@ -6,6 +6,7 @@ import { getConfig, liveModelConfigured } from "@/lib/config";
 import { listDecisions } from "@/lib/domain/repo";
 import { workerStatus } from "@/lib/domain/ops";
 import LiveStrip from "@/components/LiveStrip";
+import { SignOutButton } from "@/components/SignInForm";
 import { NavLink } from "@/components/NavLink";
 
 export const metadata: Metadata = {
@@ -15,8 +16,8 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = tryGetSession();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await tryGetSession();
   const mode = liveModelConfigured() ? "LIVE" : "SIMULATED";
   const config = getConfig();
   const pending = session ? listDecisions(session.company.id, "pending") : [];
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="tiny">
                 Backend: {config.agentBackend} · owner {session?.owner.email ?? "—"}
               </span>
+              {session ? <SignOutButton /> : null}
             </div>
           </aside>
           <main className="main">

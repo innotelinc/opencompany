@@ -1,35 +1,48 @@
-import { getConfig } from "@/lib/config";
-import { getCompanyBySlug, getOwner } from "@/lib/domain/repo";
+import { cookies } from "next/headers";
+import { resolveSessionToken, SESSION_COOKIE } from "@/lib/auth";
+import { getCompany, getHumanMember } from "@/lib/domain/repo";
 import type { Company, HumanMember } from "@/lib/domain/types";
 
 /**
- * Single-owner session for the first version.
+ * The owner session comes from a signed-in browser, never from a header or body.
  *
- * The owner is resolved on the server from configuration, never from a client
- * header or body. Every API route derives the company from this session and
- * filters by it, so a request cannot reach another company's data by asking for
- * a different id. Real multi-user sign-in is a documented gap; the schema,
- * repository and worker are already company-scoped.
+ * The cookie holds a random token; the database holds only its hash, and the
+ * company and member are read from that row. A request without a live session
+ * therefore reaches no data at all — every route and page fails closed by calling
+ * this. Middleware turns the failure into a sign-in redirect for pages and a 401
+ * for the API.
  */
 export interface Session {
   company: Company;
   owner: HumanMember;
+  sessionId: string;
+  expiresAt: string;
 }
 
-export function getSession(): Session {
-  const config = getConfig();
-  const company = getCompanyBySlug(config.companySlug);
-  if (!company) {
-    throw new Error(
-      `Company "${config.companySlug}" does not exist. Run \`npm run db:seed\` (or \`npm run db:reset\`) first.`,
-    );
+export class UnauthorizedError extends Error {
+  constructor(message = "Sign in to continue.") {
+    super(message);
+    this.name = "UnauthorizedError";
   }
-  return { company, owner: getOwner(company.id) };
 }
 
-export function tryGetSession(): Session | null {
+export async function getSession(): Promise<Session> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) throw new UnauthorizedError();
+
+  const resolved = resolveSessionToken(token);
+  if (!resolved) throw new UnauthorizedError("That session has expired. Sign in again.");
+
+  const company = getCompany(resolved.companyId);
+  const owner = getHumanMember(resolved.memberId);
+  if (!company || !owner) throw new UnauthorizedError();
+
+  return { company, owner, sessionId: resolved.id, expiresAt: resolved.expiresAt };
+}
+
+export async function tryGetSession(): Promise<Session | null> {
   try {
-    return getSession();
+    return await getSession();
   } catch {
     return null;
   }

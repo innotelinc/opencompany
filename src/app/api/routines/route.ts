@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const body = await readJson<{
       name?: string;
       instructions?: string;

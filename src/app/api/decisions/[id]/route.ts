@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const { id } = await context.params;
     const body = await readJson<{
       action?: "approve" | "reject" | "revise";

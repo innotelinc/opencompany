@@ -1,15 +1,16 @@
+import { redirect } from "next/navigation";
 import { tryGetSession } from "@/lib/session";
 import { getDb, parseJson } from "@/lib/db";
 import { listEmployees, listKnowledge } from "@/lib/domain/repo";
-import { Badge, Empty, Panel, SetupNotice, relativeTime } from "@/components/ui";
+import { Badge, Empty, Panel, relativeTime } from "@/components/ui";
 import { KnowledgeForm } from "@/components/OwnerConsole";
 import { KnowledgeEditor } from "@/components/KnowledgeEditor";
 
 export const dynamic = "force-dynamic";
 
-export default function KnowledgePage() {
-  const session = tryGetSession();
-  if (!session) return <SetupNotice />;
+export default async function KnowledgePage() {
+  const session = await tryGetSession();
+  if (!session) redirect("/signin");
   const { company } = session;
   const docs = listKnowledge(company.id);
   const employees = listEmployees(company.id);

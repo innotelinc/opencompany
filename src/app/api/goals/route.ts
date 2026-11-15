@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = getSession();
+    const session = await getSession();
     return ok({ goals: listGoals(session.company.id) });
   } catch (error) {
     return unexpected(error);
@@ -18,7 +18,7 @@ export async function GET() {
 /** The owner writes a goal by hand, outside anything the CEO proposed. */
 export async function POST(request: Request) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const body = await readJson<{ title?: string; description?: string; budgetCents?: number }>(request);
     if (!body.title?.trim()) return fail("A goal needs a title.");
 

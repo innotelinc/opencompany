@@ -20,6 +20,7 @@
     "db:rebrand": "tsx scripts/rebrand.ts",
     "db:browsers": "tsx scripts/configure-browsers.ts",
     "policy": "tsx scripts/policy.ts",
+    "auth:password": "tsx scripts/set-password.ts",
     "db:reset": "tsx scripts/reset.ts",
     "demo": "tsx scripts/demo.ts",
     "site:publish": "tsx scripts/publish-public-site.ts",

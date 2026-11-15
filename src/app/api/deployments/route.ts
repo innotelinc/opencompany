@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /** The deployment timeline: this host's deploys plus Coolify's, newest first. */
 export async function GET() {
   try {
-    getSession();
+    await getSession();
     return Response.json(await deploymentFeed(), { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return unexpected(error);
@@ -23,7 +23,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    getSession();
+    await getSession();
     const body = await readJson<{
       source?: string;
       phase?: string;

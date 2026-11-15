@@ -27,7 +27,7 @@ const MAX_LIMIT = 500;
  */
 export async function GET(request: Request) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const url = new URL(request.url);
     const params = url.searchParams;
 

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const session = getSession();
+    const session = await getSession();
     const companyId = session.company.id;
     const tasks = listTasks(companyId);
     const employees = listEmployees(companyId);

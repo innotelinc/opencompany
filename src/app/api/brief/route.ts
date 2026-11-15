@@ -14,7 +14,7 @@ interface BriefBody {
 
 export async function POST(request: Request) {
   try {
-    const session = getSession();
+    const session = await getSession();
     const body = await readJson<BriefBody>(request);
     if (!body.title?.trim()) return fail("A goal title is required.");
     if (!body.brief?.trim()) return fail("A brief is required.");

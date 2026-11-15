@@ -73,8 +73,8 @@ worker lease logic assume a single writer.
 
 ## Security notes
 
-- This version has one server-resolved owner and **no sign-in**. Put it on a
-  trusted network or behind an authenticating reverse proxy before public exposure.
+- One owner signs in with a password set by `npm run auth:password`. Serve it over
+  TLS: the password and the session cookie travel over that connection.
 - The worker executes allowlisted commands in workspace directories inside the
   container, not in a VM. Treat its container as untrusted and give it no host
   mounts beyond the data volume.
