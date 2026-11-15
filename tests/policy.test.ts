@@ -7,6 +7,7 @@ import {
   addLedgerEntry,
   getExternalAction,
   listActivity,
+  listActivityBefore,
   listDecisions,
   listExternalActions,
   listEmployees,
@@ -111,6 +112,27 @@ test("activity pages back through the trail without overlapping", () => {
   assert.equal(first.length, 2, "a page is as long as asked for");
   assert.equal(second.length, 2);
   assert.equal(new Set([...first, ...second, ...third]).size, 5, "pages walk back, never repeat an event");
+});
+
+test("a before cursor keeps its place when new events arrive", () => {
+  for (let index = 0; index < 3; index += 1) {
+    recordActivity({ companyId, actorType: "system", type: "test.paging", summary: `cursor ${index}` });
+  }
+  const first = listActivity(companyId, 2, 0);
+  const anchor = first[1];
+
+  // An event lands between the two pages; a cursor must not shift under it.
+  recordActivity({ companyId, actorType: "system", type: "test.paging", summary: "cursor newest" });
+
+  const second = listActivityBefore(companyId, anchor.createdAt, anchor.id, 10);
+  assert.ok(second.length > 0, "there is older history behind the cursor");
+  assert.ok(!second.some((event) => event.id === anchor.id), "the cursor row is not repeated");
+  assert.ok(
+    !second.some((event) => event.summary === "cursor newest"),
+    "events newer than the cursor are not pulled in",
+  );
+  const ids = new Set([...first.map((event) => event.id), ...second.map((event) => event.id)]);
+  assert.equal(ids.size, first.length + second.length, "pages do not overlap");
 });
 
 test("an activity view carries the byline and the formatted policy values", () => {

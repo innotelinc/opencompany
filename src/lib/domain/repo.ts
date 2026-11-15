@@ -905,7 +905,9 @@ export function recordActivity(input: {
 
 export function listActivity(companyId: string, limit = 60, offset = 0): ActivityEvent[] {
   return getDb()
-    .prepare("SELECT * FROM activity_events WHERE company_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    .prepare(
+      "SELECT * FROM activity_events WHERE company_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+    )
     .all(companyId, limit, offset)
     .map((r: any) => ({
       id: r.id,
@@ -919,6 +921,44 @@ export function listActivity(companyId: string, limit = 60, offset = 0): Activit
       projectId: r.project_id,
       createdAt: r.created_at,
     }));
+}
+
+/**
+ * Events older than a cursor, newest first.
+ *
+ * The cursor is (created_at, id) so several events written in the same
+ * millisecond cannot be repeated or skipped: the id is the tie-break, and the
+ * ordering here matches the one listActivity uses.
+ */
+export function listActivityBefore(
+  companyId: string,
+  beforeIso: string,
+  beforeId: string | null,
+  limit = 60,
+): ActivityEvent[] {
+  const order = "ORDER BY created_at DESC, id DESC LIMIT ?";
+  const rows = beforeId
+    ? getDb()
+        .prepare(
+          `SELECT * FROM activity_events WHERE company_id = ?
+             AND (created_at < ? OR (created_at = ? AND id < ?)) ${order}`,
+        )
+        .all(companyId, beforeIso, beforeIso, beforeId, limit)
+    : getDb()
+        .prepare(`SELECT * FROM activity_events WHERE company_id = ? AND created_at < ? ${order}`)
+        .all(companyId, beforeIso, limit);
+  return rows.map((r: any) => ({
+    id: r.id,
+    companyId: r.company_id,
+    actorType: r.actor_type,
+    actorId: r.actor_id,
+    type: r.type,
+    summary: r.summary,
+    payload: parseJson(r.payload, {}),
+    taskId: r.task_id,
+    projectId: r.project_id,
+    createdAt: r.created_at,
+  }));
 }
 
 export function recordRunEvent(input: {
