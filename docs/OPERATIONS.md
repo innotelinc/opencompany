@@ -409,7 +409,7 @@ Two things bite when wiring this up. The token is a Sanctum token presented as
 `<row id>|<secret>`, so it must keep its `id|` prefix. And Coolify answers API
 calls only from addresses in its `allowed_ips` setting: put the worker's address
 in that list, or point `COOLIFY_BASE_URL` at the private address (for example
-`http://192.168.1.93:8000`), since loopback and the public hostname are not in a
+`http://192.168.1.113:8000`), since loopback and the public hostname are not in a
 `192.168.1.0/24` allowlist.
 
 Coolify publishes from its own sources, so it cannot be handed the artifact
