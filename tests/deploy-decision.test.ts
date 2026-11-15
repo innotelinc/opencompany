@@ -53,9 +53,15 @@ test("a decision that no longer stands is not reused", () => {
 });
 
 test("the plan reuses a standing approval and waits on the owner otherwise", () => {
-  assert.equal(planDeployDecision(null), "propose", "nothing yet means ask once");
-  assert.equal(planDeployDecision({ status: "auto_approved" }), "reuse");
-  assert.equal(planDeployDecision({ status: "pending" }), "wait", "wait for the owner");
-  assert.equal(planDeployDecision({ status: "approved" }), "wait", "the owner's decision already stands");
-  assert.equal(planDeployDecision({ status: "rejected" }), "propose", "a rejection is not an approval");
+  const plan = (status: string | null) => planDeployDecision({ servedByThisApp: false, standing: status ? { status } : null });
+  assert.equal(plan(null), "propose", "nothing yet means ask once");
+  assert.equal(plan("auto_approved"), "reuse");
+  assert.equal(plan("pending"), "wait", "wait for the owner");
+  assert.equal(plan("approved"), "wait", "the owner's decision already stands");
+  assert.equal(plan("rejected"), "propose", "a rejection is not an approval");
+});
+
+test("the company's own site needs no deploy decision at all", () => {
+  assert.equal(planDeployDecision({ servedByThisApp: true, standing: null }), "served");
+  assert.equal(planDeployDecision({ servedByThisApp: true, standing: { status: "pending" } }), "served");
 });

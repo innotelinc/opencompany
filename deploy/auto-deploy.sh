@@ -41,7 +41,7 @@ fi
 echo "[auto-deploy] $(git rev-parse --short "$current") -> $(git rev-parse --short "$target") on $BRANCH"
 bash scripts/deploy.sh "$BRANCH"
 
-# The Coolify mirror follows the box. Its push webhook is rejected (the secret
-# GitHub stores no longer matches the app), so the same commit is pushed to
-# Coolify from here instead of being queued by GitHub.
-bash deploy/coolify-deploy.sh || echo "[auto-deploy] Coolify trigger failed; the box is up to date"
+# The Coolify application is no longer asked to rebuild this repository. It was a
+# second copy of the app with its own database and the same public domain, which the
+# box already serves; its builds ran out of memory on that host every time.
+

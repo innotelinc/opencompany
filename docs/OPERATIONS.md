@@ -315,11 +315,18 @@ launching Chromium and rendering a page; the server deploy currently has
 
 ## Publishing through Coolify
 
-A deliverable keeps **one** publish decision. A standing approval covers the
-class, so the first pass records the decision and every later pass queues only its
-own version under it (`deploy.queued` in the feed) instead of proposing v1, v2, v3…
-A decision the owner made by hand covers exactly the version they reviewed, and a
-pending one waits for them.
+The company's own site is **served by this application** at `/site`, from the newest
+version that passed its checks. A pass therefore publishes nothing externally: it
+records `site.published` and the version is live. It used to also ask Coolify to
+rebuild the whole application, which built a second copy of the company with its own
+database on the same public domain — on a host where both images ran out of memory
+mid-build. The box no longer triggers that, and the pass no longer proposes it.
+
+A customer deliverable keeps **one** publish decision. A standing approval covers the
+class, so the first pass records the decision and every later pass queues only its own
+version under it (`deploy.queued` in the feed) instead of proposing v1, v2, v3… A
+decision the owner made by hand covers exactly the version they reviewed, and a pending
+one waits for them.
 
 `deployment_package` publishes an owner-approved deliverable through Coolify's
 REST API on `deploy.innotel.us`; no CLI is needed at runtime. Set these on the

@@ -1283,7 +1283,24 @@ function requestDeploymentDecision(companyId: string, reviewed: Task, deliverabl
   };
 
   const standing = findDeployDecision(companyId, deliverableId);
-  const plan = planDeployDecision(standing);
+  const plan = planDeployDecision({
+    servedByThisApp: deliverable.name === PUBLIC_SITE_DELIVERABLE_NAME,
+    standing,
+  });
+  if (plan === "served") {
+    // This app serves the site itself, so a checked version is already live. Nothing
+    // to approve, and no second copy of the company to build somewhere else.
+    recordActivity({
+      companyId,
+      actorType: "system",
+      type: "site.published",
+      summary: `${deliverable.name} v${version} is live at ${target}.`,
+      taskId: reviewed.id,
+      projectId: reviewed.projectId,
+      payload: { version, url: target },
+    });
+    return;
+  }
   if (plan === "wait") return;
 
   if (plan === "reuse" && standing) {
