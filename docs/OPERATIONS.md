@@ -174,13 +174,67 @@ as strings otherwise. Each set or remove writes a `policy.updated` activity even
 the old and new value, attributed to `system`, so a direct database edit never drops
 out of the history. Removing a key that is not set writes nothing.
 
-## Reading the activity trail
+## HTTP API
 
-`GET /api/activity` returns the company's activity, newest first, in the shape the
-Activity panel renders: each row has `byline` ("5m ago · system") and `text`, and a
-policy change also carries `policy` with `key`, `from`, `to` and `note` — the same
-formatted values shown on the page. The response also includes `runEvents`, `worker`
-and `halted`.
+Everything the console does goes through routes under `/api`, and they are usable
+from a shell or a monitor as well as from the browser. Successful responses are
+`{"ok":true, …}` — the deployment feed and the deliverable preview return their own
+bodies instead; failures are `{"ok":false,"error":"…"}` with a status of 400 for a
+validation problem, 404 for something not in this company, 409 when a decision was
+already decided, 500 for an unexpected error, and 503 for health when the database
+cannot be opened. Bodies are read as JSON; a body that does not parse is treated as
+empty, so the field validation reports what is missing.
+
+### Who a request is
+
+There is no login yet. Each route calls `getSession()`, which resolves the company
+and owner from configuration on the server — never from a header or a body — and
+every query is filtered by that company id. That means any client that can reach the
+port is the owner: keep this behind the LAN or the reverse proxy, and do not expose
+`/api` to the internet until real sign-in is added (see the security checklist).
+There is no CSRF token for the same reason.
+
+### Reading
+
+| route | returns |
+| --- | --- |
+| `GET /api/health` | database reachable, company slug, agent backend, whether a live model is configured, worker heartbeat, provider health. 503 with a `hint` when the database is not seeded. |
+| `GET /api/live` | the cheap snapshot the live strip polls: `halted`, worker, counts of employees/working/open/running/completed/blocked, and the 8 newest activity rows in compact form. |
+| `GET /api/activity` | the activity trail plus `runEvents`, `worker` and `halted`. Paging is below. |
+| `GET /api/budget` | `annualLimitCents`, the monthly and quarterly pace, spend recorded this month and quarter, committed/estimated/recorded/verified cents, and model tokens. |
+| `GET /api/goals`, `GET /api/employees`, `GET /api/tasks` | the goals, the roster with departments, and every task. |
+| `GET /api/autonomy` | the owner's standing approval, or null. |
+| `GET /api/deployments` | this host's deployments merged with Coolify's, newest first, `no-store`. |
+| `GET /api/public-site/health` | whether the public site answers right now — unauthenticated and deliberately thin, 200 or 503. `HEAD` is the same answer from the last recorded probe without making a request. |
+| `GET /api/preview/<deliverableId>/<path>` | one file from the latest version of a deliverable, from inside the artifact directory, with a restrictive CSP and `private, no-store`. A private preview, not a deployment. |
+
+### Writing
+
+| route | body |
+| --- | --- |
+| `POST /api/brief` | `title`, `brief`, `requirements`, optional `budgetCents` — the owner brief that becomes a goal, a CEO plan and tasks. All three strings are required. |
+| `POST /api/company` | `action`: `halt` or `resume` (emergency stop), `update` (`name`, `mission`, `operatingPrinciples`), `department.create` (`name`, `charter`), `department.rename` (`departmentId`, `name`), `position.save` (`key`, `alias`, …), `position.reset` (`key`), `employee.title` (`employeeId`, `title`). |
+| `POST /api/employees` | `name`, `title`; optional `roleInstructions`, `departmentId`, `managerId`, `backend` (`deterministic` or `llm`), `allowedTools`, `authority`, `spendLimitCents` (clamped to 0–10000). |
+| `POST /api/employees/<id>` | `action`: `pause`, `resume`, or `fire` with an optional `reason`. Firing terminates the person and removes them from the company; their open tasks are handed to their manager, otherwise the CEO, rather than cancelled. |
+| `POST /api/tasks` | `title`, `employeeId`; optional `description`, `acceptanceCriteria`, `projectId` — work assigned by hand. |
+| `POST /api/tasks/<id>` | `action`: `cancel`, `retry`, or `reassign` with `employeeId`. |
+| `POST /api/goals` | `title`, optional `description`, `budgetCents`. `PATCH /api/goals/<id>` accepts `title`, `description`, `budgetCents`, `status`; `DELETE /api/goals/<id>` removes it. |
+| `POST /api/knowledge` | `action`: `edit` or `delete` with `id`; otherwise a create with `title`, `body`, `accessScope` (`company`, `department`, `private`), `departmentId`, `ownerEmployeeId`. |
+| `POST /api/routines` | `name`, `instructions`, `employeeId`, optional `intervalMinutes` (default 1440). |
+| `POST /api/decisions/<id>` | `action`: `approve`, `reject`, or `revise` with `note`; `approve` may carry `actionDetails`, which must match the proposal or the approval is refused (409). |
+| `POST /api/autonomy` | `action`: `grant` with `kinds` and optional `note`, or `revoke` — the owner's standing approval, stored as policy so it survives restarts. |
+| `POST /api/budget` | `annualBudgetCents` (whole cents; `0` removes the budget). The older `monthlyLimitCents` is still accepted and read as twelve months. |
+| `POST /api/computers/<employeeId>` | `action`: `takeover`, `release`, or `autonomy` with `mode` `guarded`, `yolo` or `host_control`, optional `reason`. |
+| `PATCH /api/projects/<id>` | `goalId` — which goal a project serves, or null. |
+| `POST /api/deployments` | `commit` (7–40 hex), `phase` `start` or `finish`, optional `source`, `status`, `detail` — what `scripts/deploy.sh` posts so a deploy appears in the console while it runs. |
+| `POST /api/copilotkit` | the owner chat. Answers 503 with an explanation when no model key is configured; the forms and decision buttons do not need one. |
+
+### Paging the activity trail
+
+`GET /api/activity` returns the activity, newest first, in the shape the Activity
+panel renders: each row has `byline` ("5m ago · system") and `text`, and a policy
+change also carries `policy` with `key`, `from`, `to` and `note` — the same formatted
+values shown on the page.
 
 Page size is `?limit=`, 1–500, default 40. There are two ways to go further back:
 
@@ -199,6 +253,7 @@ millisecond cannot repeat or vanish.
 ```
 curl -s 'https://opencompany.innotel.site/api/activity?limit=20'
 curl -s 'https://opencompany.innotel.site/api/activity?limit=20&cursor=<nextCursor>'
+curl -s 'https://opencompany.innotel.site/api/health'
 ```
 
 Bad input comes back as a 400 with a reason: a `limit` outside 1–500, a negative
