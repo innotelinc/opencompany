@@ -304,8 +304,8 @@ The public face of the company is served, read-only and without an owner session
 brief, the recurring `Public site: improvement pass` routine and the employee's
 computer. The routine is work, not a plan, so it does not wait for a plan approval;
 its deliverable still has to pass the automated checks, and the standard independent
-review task is created for it. Publishing the site to an external provider remains an
-owner decision and is blocked while no provider is configured.
+review task is created for it. The newest version that passed its checks is what
+`/site` serves; nothing is published anywhere else.
 
 Browser steps are optional: install Playwright and Chromium (`npm i -D playwright &&
 npx playwright install chromium`) and set `OPENCOMPANY_BROWSER_ENABLED=1`. Browsers
@@ -313,14 +313,14 @@ launch inside the employee workspace only. The local install was verified by
 launching Chromium and rendering a page; the server deploy currently has
 `OPENCOMPANY_BROWSER_ENABLED=0` because no Chromium is installed there.
 
-## Publishing through Coolify
+## Publishing
 
 The company's own site is **served by this application** at `/site`, from the newest
 version that passed its checks. A pass therefore publishes nothing externally: it
-records `site.published` and the version is live. It used to also ask Coolify to
+records `site.published` and the version is live. It once also asked Coolify to
 rebuild the whole application, which built a second copy of the company with its own
 database on the same public domain — on a host where both images ran out of memory
-mid-build. The box no longer triggers that, and the pass no longer proposes it.
+mid-build. That mirror is gone.
 
 A customer deliverable keeps **one** publish decision. A standing approval covers the
 class, so the first pass records the decision and every later pass queues only its own
@@ -328,26 +328,18 @@ version under it (`deploy.queued` in the feed) instead of proposing v1, v2, v3�
 decision the owner made by hand covers exactly the version they reviewed, and a pending
 one waits for them.
 
-`deployment_package` publishes an owner-approved deliverable through Coolify's
-REST API on `deploy.innotel.us`; no CLI is needed at runtime. Set these on the
-worker's host (never in the browser or a tracked file):
+This host runs with `OPENCOMPANY_DEPLOY_PROVIDER=none`, so an approved customer
+deployment is assembled into a local package (with its `DEPLOYMENT.md`) and recorded as
+**blocked** with the reason. Nothing leaves the box. To publish for real, configure a
+provider below.
 
-```sh
-OPENCOMPANY_DEPLOY_PROVIDER=coolify
-COOLIFY_BASE_URL=https://deploy.innotel.us
-COOLIFY_TOKEN=...      # Coolify → Keys & Tokens → API tokens
-COOLIFY_APP_UUID=...   # the application's uuid, not its name
-OPENCOMPANY_DEPLOY_NAME=opencompany-site
-```
-
-The OPENco. application on that instance is a Docker Compose resource built
-from `docker-compose.coolify.yaml`, and it is published at
-`http://opencompany.73.68.203.71.sslip.io` through Coolify's proxy. Coolify
-keeps a compose application's domains per service in `docker_compose_domains`,
-not in `fqdn`, so set them on the application's `web` service. That name only
-resolves on the LAN: from the internet the box's public IP is fronted by a
-gateway that serves `deploy.innotel.us` alone, so publishing under a real
-hostname needs a DNS record and a matching route on that gateway.
+A provider publishes from its own sources, so it cannot be handed the artifact
+files: the executor assembles the package locally (with `DEPLOYMENT.md`, for the
+audit trail), triggers a deployment, waits for it to finish, then fetches the
+public domain once. The outcome records whether the URL was reachable, so
+`succeeded` means published rather than merely accepted. The action is claimed
+exactly once: a failed or uncertain publication is never retried automatically,
+and a changed artifact invalidates the approval hash.
 
 ### Auto-deploy on push
 
@@ -371,27 +363,9 @@ systemctl list-timers opencompany-autodeploy.timer
 Deployments report themselves. `scripts/deploy.sh` appends a start and a finish to
 `$OPENCOMPANY_DATA_DIR/deploy-events.jsonl` and POSTs the same JSON to
 `OPENCOMPANY_DEPLOY_NOTIFY_URL` when that is set, and Administration →
-Deployments also lists Coolify's own deployments through its API. A start with no
-finish is shown as running rather than hidden, and a failure keeps the reason.
+Deployments lists them. A start with no finish is shown as running rather than
+hidden, and a failure keeps the reason.
 `/api/deployments` returns the same feed for a monitor; no journal reading.
-
-The Coolify instance deploys on the same push through a GitHub webhook, because
-the webhook runs in the other direction: Coolify is reachable at
-`deploy.innotel.us`, so GitHub calls it. The hook points at
-`/webhooks/source/github/events/manual` with the `push` event, and the shared
-secret lives per application in `manual_webhook_secret_github` (encrypted at
-rest — set it through the framework, never with raw SQL). Coolify verifies
-`X-Hub-Signature-256` against the raw body and refuses anything else with
-`No matching application or invalid signature.`
-
-```sh
-gh api repos/innotelinc/opencompany/hooks --jq '.[] | {id, events, active}'
-gh api repos/innotelinc/opencompany/hooks/710665888/deliveries --jq '.[0:3] | .[] | {event, status_code}'
-```
-
-So one push does both: the box pulls within a minute, and Coolify starts a build
-immediately. The two are independent — a failed build on one side does not stop
-the other, and both leave the previous version serving.
 
 ### The public site
 
@@ -412,25 +386,7 @@ back after a redeploy. The owner edits the budget in Administration; a ceiling o
 0 means no ceiling, which silences overrun warnings but not the approval in front
 of real money.
 
-Two things bite when wiring this up. The token is a Sanctum token presented as
-`<row id>|<secret>`, so it must keep its `id|` prefix. And Coolify answers API
-calls only from addresses in its `allowed_ips` setting: put the worker's address
-in that list, or point `COOLIFY_BASE_URL` at the private address (for example
-`http://192.168.1.113:8000`), since loopback and the public hostname are not in a
-`192.168.1.0/24` allowlist.
-
-Coolify publishes from its own sources, so it cannot be handed the artifact
-files: the executor assembles the package locally (with `DEPLOYMENT.md`, for the
-audit trail), triggers a deployment of the configured application, waits for it
-to finish, then fetches the public domain once. The outcome records whether the
-URL was reachable, so `succeeded` means published rather than merely accepted.
-Until both `COOLIFY_TOKEN` and `COOLIFY_APP_UUID` are present, an approved
-deployment is packaged locally and recorded as **blocked** with the provider
-reason; it is not published. The action is still claimed exactly once: a failed
-or uncertain publication is never retried automatically, and a changed artifact
-invalidates the approval hash.
-
-### Vercel instead
+### Vercel
 
 Set `OPENCOMPANY_DEPLOY_PROVIDER=vercel` with `VERCEL_TOKEN` and
 `VERCEL_PROJECT_ID` (optional `VERCEL_TEAM_ID`). That path uploads the approved
