@@ -32,13 +32,7 @@ export function getConfig() {
       baseUrl: (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, ""),
     },
     deployment: {
-      provider: (process.env.OPENCOMPANY_DEPLOY_PROVIDER ?? "coolify").toLowerCase(),
-      coolify: {
-        baseUrl: (process.env.COOLIFY_BASE_URL?.trim() || "https://deploy.innotel.us").replace(/\/$/, ""),
-        token: process.env.COOLIFY_TOKEN?.trim() ?? "",
-        appUuid: process.env.COOLIFY_APP_UUID?.trim() ?? "",
-        projectName: process.env.OPENCOMPANY_DEPLOY_NAME?.trim() || "opencompany-site",
-      },
+      provider: (process.env.OPENCOMPANY_DEPLOY_PROVIDER ?? "none").toLowerCase(),
       vercel: {
         token: process.env.VERCEL_TOKEN?.trim() ?? "",
         projectId: process.env.VERCEL_PROJECT_ID?.trim() ?? "",

@@ -41,7 +41,7 @@ fi
 echo "[auto-deploy] $(git rev-parse --short "$current") -> $(git rev-parse --short "$target") on $BRANCH"
 bash scripts/deploy.sh "$BRANCH"
 
-# The Coolify application is no longer asked to rebuild this repository. It was a
-# second copy of the app with its own database and the same public domain, which the
-# box already serves; its builds ran out of memory on that host every time.
+# This host deploys itself. Nothing else is asked to rebuild the repository: a
+# second copy of the app elsewhere would carry its own database and compete for the
+# same public domain.
 

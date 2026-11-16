@@ -289,11 +289,6 @@ export default async function AdministrationPage() {
               ))}
             </ul>
           )}
-          {feed.note ? (
-            <p className="tiny faint" style={{ marginTop: 10 }}>
-              {feed.note}
-            </p>
-          ) : null}
         </Panel>
 
         <Panel title="Public site" hint="Watched, not assumed">

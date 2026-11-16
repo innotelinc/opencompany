@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applicationUrl } from "../src/lib/engine/coolify";
 import { externalActionAdapter } from "../src/lib/engine/external";
 
 const KEYS = [
   "OPENCOMPANY_DEPLOY_PROVIDER",
-  "COOLIFY_BASE_URL",
-  "COOLIFY_TOKEN",
-  "COOLIFY_APP_UUID",
   "VERCEL_TOKEN",
   "VERCEL_PROJECT_ID",
 ] as const;
@@ -31,57 +27,32 @@ function withEnv(values: Record<string, string | undefined>, run: () => void) {
   }
 }
 
-test("a fresh install deploys through Coolify, not Vercel", () => {
+test("a fresh install has no deployment provider and says so", () => {
   withEnv({}, () => {
     const unavailable = externalActionAdapter("deployment_package");
     assert.equal(unavailable.configured, false);
-    assert.equal(unavailable.id, "coolify");
+    assert.equal(unavailable.id, "none");
     assert.match(unavailable.note, /No public deployment provider/i);
-    assert.match(unavailable.note, /COOLIFY_TOKEN/);
-    assert.doesNotMatch(unavailable.note, /VERCEL_TOKEN/);
+    assert.match(unavailable.note, /OPENCOMPANY_DEPLOY_PROVIDER=vercel/);
   });
 });
 
-test("a configured Coolify app reports ready without leaking the token", () => {
-  withEnv({ COOLIFY_TOKEN: "coolify-token-value", COOLIFY_APP_UUID: "app_uuid_1" }, () => {
-    const configured = externalActionAdapter("deployment_package");
-    assert.equal(configured.configured, true);
-    assert.equal(configured.id, "coolify");
-    assert.match(configured.note, /deploy\.innotel\.us/);
-    assert.doesNotMatch(configured.note, /coolify-token-value/);
-  });
-});
-
-test("Coolify needs both the token and the application uuid", () => {
-  withEnv({ COOLIFY_TOKEN: "coolify-token-value" }, () => {
+test("Vercel is configured only when it is selected and has both ids", () => {
+  withEnv({ OPENCOMPANY_DEPLOY_PROVIDER: "vercel", VERCEL_TOKEN: "test-token-value" }, () => {
     assert.equal(externalActionAdapter("deployment_package").configured, false);
   });
-  withEnv({ COOLIFY_APP_UUID: "app_uuid_1" }, () => {
+  withEnv({ OPENCOMPANY_DEPLOY_PROVIDER: "vercel", VERCEL_PROJECT_ID: "prj_test" }, () => {
     assert.equal(externalActionAdapter("deployment_package").configured, false);
   });
-});
-
-test("Vercel still works when explicitly selected", () => {
-  withEnv({ OPENCOMPANY_DEPLOY_PROVIDER: "vercel", VERCEL_TOKEN: "test-token-value", VERCEL_PROJECT_ID: "prj_test" }, () => {
-    const configured = externalActionAdapter("deployment_package");
-    assert.equal(configured.configured, true);
-    assert.equal(configured.id, "vercel");
-    assert.doesNotMatch(configured.note, /test-token-value/);
-  });
-});
-
-test("a compose application's domain comes from its service map", () => {
-  assert.equal(
-    applicationUrl(null, '{"web":{"domain":"http://opencompany.73.68.203.71.sslip.io"}}'),
-    "http://opencompany.73.68.203.71.sslip.io",
+  withEnv(
+    { OPENCOMPANY_DEPLOY_PROVIDER: "vercel", VERCEL_TOKEN: "test-token-value", VERCEL_PROJECT_ID: "prj_test" },
+    () => {
+      const configured = externalActionAdapter("deployment_package");
+      assert.equal(configured.configured, true);
+      assert.equal(configured.id, "vercel");
+      assert.doesNotMatch(configured.note, /test-token-value/);
+    },
   );
-  assert.equal(
-    applicationUrl("https://plain.example"),
-    "https://plain.example",
-    "a plain application still reads fqdn",
-  );
-  assert.equal(applicationUrl(null, null), "");
-  assert.equal(applicationUrl(null, "not-json{"), "");
 });
 
 test("an unsupported deployment provider fails closed", () => {

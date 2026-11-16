@@ -41,17 +41,17 @@ test("a deployment with no finish is reported as running, not dropped", () => {
   assert.equal(rows[0].finishedAt, undefined);
 });
 
-test("deployments are newest first and both sources share the list", () => {
+test("deployments are newest first", () => {
   const rows = groupDeployments([
     start("aaa1111", "2026-11-12T03:00:00Z"),
     finish("aaa1111", "2026-11-12T03:01:00Z"),
-    { ...start("bbb2222", "2026-11-12T04:00:00Z"), source: "coolify" },
+    start("bbb2222", "2026-11-12T04:00:00Z"),
   ]);
   assert.deepEqual(
     rows.map((row) => row.commit),
     ["bbb2222", "aaa1111"],
   );
-  assert.equal(rows[0].source, "coolify");
+  assert.equal(rows[0].source, "box");
 });
 
 test("a finish without a start is still shown", () => {

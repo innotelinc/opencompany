@@ -237,7 +237,7 @@ page. The only routes reachable signed out are `/api/health` and
 | `GET /api/budget` | `annualLimitCents`, the monthly and quarterly pace, spend recorded this month and quarter, committed/estimated/recorded/verified cents, and model tokens. |
 | `GET /api/goals`, `GET /api/employees`, `GET /api/tasks` | the goals, the roster with departments, and every task. |
 | `GET /api/autonomy` | the owner's standing approval, or null. |
-| `GET /api/deployments` | this host's deployments merged with Coolify's, newest first, `no-store`. |
+| `GET /api/deployments` | this host's deployments, newest first, `no-store`. |
 | `GET /api/public-site/health` | whether the public site answers right now — unauthenticated and deliberately thin, 200 or 503. `HEAD` is the same answer from the last recorded probe without making a request. |
 | `GET /api/preview/<deliverableId>/<path>` | one file from the latest version of a deliverable, from inside the artifact directory, with a restrictive CSP and `private, no-store`. A private preview, not a deployment. |
 
@@ -317,10 +317,10 @@ launching Chromium and rendering a page; the server deploy currently has
 
 The company's own site is **served by this application** at `/site`, from the newest
 version that passed its checks. A pass therefore publishes nothing externally: it
-records `site.published` and the version is live. It once also asked Coolify to
-rebuild the whole application, which built a second copy of the company with its own
-database on the same public domain — on a host where both images ran out of memory
-mid-build. That mirror is gone.
+records `site.published` and the version is live. It once also asked a second host to
+rebuild the whole application, which would have been a second copy of the company with
+its own database on the same public domain — and its builds ran out of memory there.
+That mirror is gone.
 
 A customer deliverable keeps **one** publish decision. A standing approval covers the
 class, so the first pass records the decision and every later pass queues only its own

@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The deployment timeline: this host's deploys plus Coolify's, newest first. */
+/** The deployment timeline: this host's deploys, newest first. */
 export async function GET() {
   try {
     await getSession();
@@ -25,7 +25,6 @@ export async function POST(request: Request) {
   try {
     await getSession();
     const body = await readJson<{
-      source?: string;
       phase?: string;
       status?: string;
       commit?: string;
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
 
     const recorded = recordDeployEvent({
       at: new Date().toISOString(),
-      source: body.source === "coolify" ? "coolify" : "box",
+      source: "box",
       phase: body.phase,
       status: body.status?.slice(0, 40) || (body.phase === "start" ? "started" : "succeeded"),
       commit: body.commit.toLowerCase(),
