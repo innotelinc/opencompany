@@ -390,9 +390,23 @@ and `OPENCOMPANY_DEPLOY_PROVIDER=none` because that host serves itself. The old
 192.168.1.113 values were stale and have been replaced.
 
 Coolify's own Traefik could not start on i2 because oauth2-proxy already owns host
-port 8080, which is why the application publishes a port instead of a domain. If
-that port is ever freed, the domain route can be switched on and the forward
-dropped.
+port 8080 (it also wants 80 and 443), which is why the application publishes a port
+instead of a domain. The proxy is therefore stopped deliberately, with Coolify's own
+stop action, so its server check leaves it down:
+
+```sh
+docker exec coolify php artisan tinker --execute="App\Actions\Proxy\StopProxy::run(App\Models\Server::first(), true);"
+```
+
+That removes the `coolify-proxy` container and sets `force_stop` on the server's
+proxy, which is the flag `ServerCheckJob` and `PushServerUpdateJob` read before
+starting it again. Verify with `docker ps -a | grep coolify-proxy` (nothing) and
+`docker exec coolify php artisan tinker --execute="echo App\Models\Server::first()->proxy->force_stop;"`
+(`1`). The application is unaffected either way: it publishes port 3001 through
+Docker, not through the proxy, and its volume is mounted by the container, not by the
+proxy. If the required ports are ever freed, start the proxy from Server → Proxy and
+the domain route can be switched on; until then it must stay stopped rather than
+retry every check.
 
 A customer deliverable keeps **one** publish decision. A standing approval covers the
 class, so the first pass records the decision and every later pass queues only its own
