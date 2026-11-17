@@ -331,7 +331,7 @@ a Coolify application; a second application with its own database behind the sam
 domain is what went wrong here before.
 
 ```sh
-COOLIFY_BASE_URL=http://192.168.1.113:8000   # no trailing slash
+COOLIFY_BASE_URL=http://192.168.1.52:8000    # no trailing slash
 COOLIFY_TOKEN=…                              # server-side only
 COOLIFY_APP_UUID=…                           # the application uuid, not its name
 COOLIFY_APP_NAME=opencompany                 # label in the console
@@ -343,10 +343,18 @@ needs an owner session and returns the Coolify deployment uuid rather than waiti
 because the caller is usually the container being replaced;
 `updateInPlace()` in `src/lib/engine/coolify.ts` is the waiting variant, for workers.
 
-Only one host runs the application. If Coolify runs it, this box's systemd
-`opencompany-autodeploy` timer must not also serve the public domain: leave
-`OPENCOMPANY_DEPLOY_PROVIDER=none` while this host serves the site itself, and use
-`coolify` only when Coolify is the host.
+Only one host runs the application, and here it is i2: Coolify runs it as one
+container with the `opencompany-data` volume and publishes port 3001. The public
+front still forwards to i1 on port 3000, so i1 runs `opencompany-forward.service`
+(`/usr/local/bin/opencompany-forward.mjs`), a plain TCP forward to `192.168.1.52:3001`.
+That keeps one public origin and one copy of the application; i1's
+`opencompany-web`, `opencompany-worker` and `opencompany-autodeploy.timer` are
+disabled, and its `.data` directory stays as it was for rollback.
+
+Coolify's own Traefik could not start on i2 because oauth2-proxy already owns host
+port 8080, which is why the application publishes a port instead of a domain. If
+that port is ever freed, the domain route can be switched on and the forward
+dropped.
 
 A customer deliverable keeps **one** publish decision. A standing approval covers the
 class, so the first pass records the decision and every later pass queues only its own
@@ -369,6 +377,10 @@ exactly once: a failed or uncertain publication is never retried automatically,
 and a changed artifact invalidates the approval hash.
 
 ### Auto-deploy on push
+
+This installation no longer uses it: the timer is disabled on i1 and Coolify on i2
+owns deployments, so nothing builds a second copy. The self-hosted path is kept
+documented for a box that runs the application itself.
 
 `bash deploy/install-auto-deploy.sh` (once, as root) installs
 `/usr/local/bin/opencompany-autodeploy` and a systemd timer that runs it every
