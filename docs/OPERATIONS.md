@@ -317,10 +317,36 @@ launching Chromium and rendering a page; the server deploy currently has
 
 The company's own site is **served by this application** at `/site`, from the newest
 version that passed its checks. A pass therefore publishes nothing externally: it
-records `site.published` and the version is live. It once also asked a second host to
-rebuild the whole application, which would have been a second copy of the company with
-its own database on the same public domain — and its builds ran out of memory there.
-That mirror is gone.
+records `site.published` and the version is live.
+
+### Coolify is the deployment centre
+
+Coolify owns the running copy of this application. It is configured with exactly one
+application — one uuid, one public domain, one data volume — and Administration →
+Deployments shows its status, its domain and an **Update in place** button. An update
+asks Coolify to rebuild that same application: the running container is replaced by
+the new one, the domain and the `.data` volume do not change, and the site is never
+served from two copies at once. Nothing in this repository creates, clones or deletes
+a Coolify application; a second application with its own database behind the same
+domain is what went wrong here before.
+
+```sh
+COOLIFY_BASE_URL=http://192.168.1.113:8000   # no trailing slash
+COOLIFY_TOKEN=…                              # server-side only
+COOLIFY_APP_UUID=…                           # the application uuid, not its name
+COOLIFY_APP_NAME=opencompany                 # label in the console
+OPENCOMPANY_DEPLOY_PROVIDER=coolify          # Coolify owns the running copy
+```
+
+`POST /api/deployments/update` queues the same rebuild for a script or a monitor. It
+needs an owner session and returns the Coolify deployment uuid rather than waiting,
+because the caller is usually the container being replaced;
+`updateInPlace()` in `src/lib/engine/coolify.ts` is the waiting variant, for workers.
+
+Only one host runs the application. If Coolify runs it, this box's systemd
+`opencompany-autodeploy` timer must not also serve the public domain: leave
+`OPENCOMPANY_DEPLOY_PROVIDER=none` while this host serves the site itself, and use
+`coolify` only when Coolify is the host.
 
 A customer deliverable keeps **one** publish decision. A standing approval covers the
 class, so the first pass records the decision and every later pass queues only its own
@@ -331,7 +357,8 @@ one waits for them.
 This host runs with `OPENCOMPANY_DEPLOY_PROVIDER=none`, so an approved customer
 deployment is assembled into a local package (with its `DEPLOYMENT.md`) and recorded as
 **blocked** with the reason. Nothing leaves the box. To publish for real, configure a
-provider below.
+provider below. Coolify deploys from its own sources, so it cannot take delivered
+artifact files even when it owns the application: the package stays local.
 
 A provider publishes from its own sources, so it cannot be handed the artifact
 files: the executor assembles the package locally (with `DEPLOYMENT.md`, for the

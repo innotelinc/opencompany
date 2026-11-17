@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { coolifyNote } from "../src/lib/engine/coolify";
 import { externalActionAdapter } from "../src/lib/engine/external";
 
 const KEYS = [
   "OPENCOMPANY_DEPLOY_PROVIDER",
   "VERCEL_TOKEN",
   "VERCEL_PROJECT_ID",
+  "COOLIFY_BASE_URL",
+  "COOLIFY_URL",
+  "COOLIFY_TOKEN",
+  "COOLIFY_APP_UUID",
 ] as const;
 
 /** Run with a clean, explicit deployment environment, then restore it. */
@@ -61,4 +66,40 @@ test("an unsupported deployment provider fails closed", () => {
     assert.equal(adapter.configured, false);
     assert.match(adapter.note, /No adapter is installed/i);
   });
+});
+
+test("Coolify asks for its application uuid before it claims to be configured", () => {
+  withEnv(
+    {
+      OPENCOMPANY_DEPLOY_PROVIDER: "coolify",
+      COOLIFY_BASE_URL: "http://192.0.2.10:8000",
+      COOLIFY_TOKEN: "test-token-value",
+    },
+    () => {
+      const adapter = externalActionAdapter("deployment_package");
+      assert.equal(adapter.id, "coolify");
+      assert.equal(adapter.configured, false);
+      assert.match(adapter.note, /COOLIFY_APP_UUID/);
+      assert.doesNotMatch(adapter.note, /test-token-value/);
+    },
+  );
+});
+
+test("a configured Coolify updates one application in place and never takes files", () => {
+  withEnv(
+    {
+      OPENCOMPANY_DEPLOY_PROVIDER: "coolify",
+      COOLIFY_BASE_URL: "http://192.0.2.10:8000/",
+      COOLIFY_TOKEN: "test-token-value",
+      COOLIFY_APP_UUID: "app_uuid_test",
+    },
+    () => {
+      const adapter = externalActionAdapter("deployment_package");
+      assert.equal(adapter.id, "coolify");
+      assert.equal(adapter.configured, false);
+      assert.match(adapter.note, /in place/i);
+      // The trailing slash was stripped, so the note names the host cleanly.
+      assert.match(coolifyNote(), /8000 owns application app_uuid_test/);
+    },
+  );
 });

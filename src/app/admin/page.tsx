@@ -16,13 +16,14 @@ import { getProviderHealth } from "@/lib/domain/provider";
 import { ALL_CHECKS, checkDescription } from "@/lib/engine/checks";
 import { Badge, Empty, Panel, relativeTime } from "@/components/ui";
 import { ActionButton, RoutineForm } from "@/components/OwnerConsole";
-import { BudgetSettings, QuarterReview, SiteProbeButton, SpendHistory } from "@/components/BudgetControls";
+import { BudgetSettings, DeploymentUpdateButton, QuarterReview, SiteProbeButton, SpendHistory } from "@/components/BudgetControls";
 import { SessionList } from "@/components/SessionList";
 import { PasswordForm } from "@/components/PasswordForm";
 import { listMemberSessions } from "@/lib/auth";
 import { spendAnalytics } from "@/lib/domain/analytics";
 import { lastProbe, publicSiteUrl } from "@/lib/public-site/uptime";
 import { deploymentFeed } from "@/lib/domain/deployments";
+import { deploymentCenter } from "@/lib/engine/coolify";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function AdministrationPage() {
   const unknown = listTasks(company.id).filter((task) => task.status === "blocked");
   const siteProbe = lastProbe(company.id);
   const feed = await deploymentFeed();
+  const center = await deploymentCenter();
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -256,6 +258,29 @@ export default async function AdministrationPage() {
 
       <div className="grid two">
         <Panel title="Deployments" hint={feed.rows.length ? `${feed.rows.length} recent` : "none yet"}>
+          <dl className="kv">
+            <dt>Deployment centre</dt>
+            <dd>{center.id === "coolify" ? "Coolify" : "not configured"}</dd>
+            <dt>Application</dt>
+            <dd className="mono tiny">{center.live?.name ?? (center.configured ? "not reporting" : "—")}</dd>
+            <dt>Live copy</dt>
+            <dd className="tiny">
+              {center.live
+                ? `${center.live.status}${center.live.url ? ` · ${center.live.url}` : " · no domain"}`
+                : "—"}
+            </dd>
+            <dt>Updates</dt>
+            <dd className="tiny faint">
+              One application is rebuilt in place: same domain, same data volume, so the site is never served from two
+              copies at once.
+            </dd>
+          </dl>
+          <p className="tiny faint" style={{ marginTop: 10 }}>{center.note}</p>
+          {center.configured ? (
+            <div className="row" style={{ marginTop: 10 }}>
+              <DeploymentUpdateButton />
+            </div>
+          ) : null}
           {feed.rows.length === 0 ? (
             <Empty>No deployment has been recorded yet.</Empty>
           ) : (

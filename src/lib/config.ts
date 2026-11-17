@@ -39,6 +39,14 @@ export function getConfig() {
         teamId: process.env.VERCEL_TEAM_ID?.trim() ?? "",
         projectName: process.env.OPENCOMPANY_DEPLOY_NAME?.trim() || "opencompany-site",
       },
+      // The deployment centre. One application, updated in place: no second copy,
+      // no second database behind the same domain.
+      coolify: {
+        baseUrl: (process.env.COOLIFY_BASE_URL ?? process.env.COOLIFY_URL ?? "").replace(/\/+$/, ""),
+        token: process.env.COOLIFY_TOKEN?.trim() ?? "",
+        appUuid: (process.env.COOLIFY_APP_UUID ?? "").trim(),
+        appName: process.env.COOLIFY_APP_NAME?.trim() || "opencompany",
+      },
     },
     limits: {
       // The budget is yearly. It is measured monthly and adjusted quarterly on

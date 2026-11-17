@@ -30,6 +30,10 @@ x-opencompany-environment: &opencompany-environment
   VERCEL_TOKEN: ${VERCEL_TOKEN:-}
   VERCEL_PROJECT_ID: ${VERCEL_PROJECT_ID:-}
   VERCEL_TEAM_ID: ${VERCEL_TEAM_ID:-}
+  COOLIFY_BASE_URL: ${COOLIFY_BASE_URL:-}
+  COOLIFY_TOKEN: ${COOLIFY_TOKEN:-}
+  COOLIFY_APP_UUID: ${COOLIFY_APP_UUID:-}
+  COOLIFY_APP_NAME: ${COOLIFY_APP_NAME:-opencompany}
 
 services:
   web:

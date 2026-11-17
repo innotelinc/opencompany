@@ -1,15 +1,20 @@
 import { deploymentFeed, recordDeployEvent } from "@/lib/domain/deployments";
+import { deploymentCenter } from "@/lib/engine/coolify";
 import { fail, ok, readJson, unexpected } from "@/lib/api";
 import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The deployment timeline: this host's deploys, newest first. */
+/**
+ * The deployment timeline and the deployment centre: this host's deploys newest
+ * first, plus who owns the running copy and where it is served.
+ */
 export async function GET() {
   try {
     await getSession();
-    return Response.json(await deploymentFeed(), { headers: { "cache-control": "no-store" } });
+    const [feed, center] = await Promise.all([deploymentFeed(), deploymentCenter()]);
+    return Response.json({ ...feed, center }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return unexpected(error);
   }

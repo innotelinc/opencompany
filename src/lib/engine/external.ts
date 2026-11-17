@@ -14,6 +14,7 @@ import {
   updateDecision,
 } from "@/lib/domain/repo";
 import { readArtifactFiles } from "@/lib/engine/artifacts";
+import { coolifyConfigured, coolifyNote, coolifyProvider } from "@/lib/engine/coolify";
 import { publishToVercel } from "@/lib/engine/vercel";
 
 /**
@@ -42,6 +43,24 @@ type DeploymentTarget = {
 /** Provider state for deployment actions. Secrets stay server-side and are never logged. */
 function deploymentTarget(): DeploymentTarget {
   const { deployment } = getConfig();
+  if (deployment.provider === "coolify") {
+    const coolify = coolifyProvider();
+    // Coolify updates the application it runs in place; it deploys from its own
+    // sources, so delivered artifact files still cannot be handed to it. Reporting
+    // it as unconfigured here keeps that honest instead of rebuilding the company
+    // application to "publish" somebody else's site.
+    return {
+      id: "coolify",
+      configured: false,
+      note: coolifyConfigured(coolify)
+        ? "Coolify runs this application and updates it in place from Administration → Deployments. It deploys from its own sources, so delivered files are assembled into a local package and not published."
+        : `Coolify is selected as the deployment centre but is not configured. ${coolifyNote(coolify)}`,
+      token: "",
+      projectId: "",
+      teamId: "",
+      projectName: coolify.appName,
+    };
+  }
   if (deployment.provider === "vercel") {
     const { token, projectId, teamId, projectName } = deployment.vercel;
     const configured = Boolean(token && projectId);
@@ -63,7 +82,7 @@ function deploymentTarget(): DeploymentTarget {
     configured: false,
     note:
       id === "none"
-        ? "No public deployment provider is configured, so an approved deployment is packaged locally and not published. Set OPENCOMPANY_DEPLOY_PROVIDER=vercel to publish it."
+        ? "No public deployment provider is configured, so an approved deployment is packaged locally and not published. Set OPENCOMPANY_DEPLOY_PROVIDER=vercel to publish it, or =coolify to let Coolify own the running application."
         : `No adapter is installed for deployment provider "${id}". Set OPENCOMPANY_DEPLOY_PROVIDER=vercel to publish approved deployments.`,
     token: "",
     projectId: "",

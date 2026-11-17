@@ -280,3 +280,51 @@ export function SiteProbeButton() {
     </span>
   );
 }
+
+/**
+ * Ask Coolify to rebuild the one running application in place.
+ *
+ * The browser is talking to the container being replaced, so a queued update is the
+ * whole answer: the domain and the data volume do not change, and the page reconnects
+ * when the new copy answers.
+ */
+export function DeploymentUpdateButton() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  return (
+    <span className="row" style={{ gap: 8 }}>
+      <button
+        type="button"
+        className="btn small"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setMessage(null);
+          try {
+            const response = await fetch("/api/deployments/update", { method: "POST" });
+            const payload = (await response.json().catch(() => ({}))) as {
+              ok?: boolean;
+              error?: string;
+              deploymentUuid?: string | null;
+            };
+            setMessage(
+              response.ok && payload.ok
+                ? `Update queued${payload.deploymentUuid ? ` (${payload.deploymentUuid.slice(0, 8)})` : ""}. The same application rebuilds; the domain and data volume stay.`
+                : (payload.error ?? `Could not queue an update (${response.status}).`),
+            );
+            router.refresh();
+          } catch (error) {
+            setMessage(String(error));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Queueing…" : "Update in place"}
+      </button>
+      {message ? <span className="tiny faint">{message}</span> : null}
+    </span>
+  );
+}

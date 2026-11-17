@@ -10,7 +10,7 @@ import { getConfig } from "@/lib/config";
  * it into a list the owner can look at, and pairs each start with its finish so a
  * deployment has a duration instead of two orphaned lines.
  */
-export type DeploySource = "box";
+export type DeploySource = "box" | "coolify";
 export type DeployPhase = "start" | "finish";
 
 export interface DeployEvent {
@@ -76,7 +76,7 @@ export function readDeployEvents(): DeployEvent[] {
       if (!parsed.at || !parsed.commit) continue;
       events.push({
         at: String(parsed.at),
-        source: "box",
+        source: parsed.source === "coolify" ? "coolify" : "box",
         phase: parsed.phase === "finish" ? "finish" : "start",
         status: String(parsed.status ?? "unknown"),
         commit: String(parsed.commit),
