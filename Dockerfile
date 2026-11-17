@@ -27,4 +27,6 @@ ENV NODE_ENV=production
 ENV OPENCOMPANY_DATA_DIR=/app/.data
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# One container: migrate, optionally restore a snapshot, then run the worker beside
+# the web process against the same data volume. See deploy/docker-entrypoint.sh.
+CMD ["sh", "deploy/docker-entrypoint.sh"]
