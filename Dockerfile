@@ -26,6 +26,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 RUN npx playwright install --with-deps chromium
 
 COPY . .
+# Prints the headroom the build is about to work with, so an exit 137 is measurable.
+RUN free -m || true
 RUN npm run build
 
 ENV NODE_ENV=production
