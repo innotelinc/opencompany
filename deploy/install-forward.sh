@@ -71,7 +71,8 @@ if ! systemctl is-active --quiet "$SERVICE"; then
   exit 1
 fi
 
-PORT="$(grep -m1 '^Environment=FORWARD_PORT=' "$UNIT" | cut -d= -f2)"
+# Environment=FORWARD_PORT=3000 has three fields; the port is the third.
+PORT="$(grep -m1 '^Environment=FORWARD_PORT=' "$UNIT" | cut -d= -f3)"
 if ! curl -fsS -m 5 "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
   echo "[forward] $SERVICE is running but :${PORT}/api/health does not answer" >&2
   echo "[forward] check the application host and FORWARD_HOST/FORWARD_TARGET_PORT" >&2
