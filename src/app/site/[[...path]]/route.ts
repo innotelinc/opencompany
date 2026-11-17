@@ -97,8 +97,11 @@ export async function GET(
     headers: {
       "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream",
       "cache-control": "public, max-age=30",
+      // The published pages carry their own inline styles, so the policy has to allow
+      // them: without 'unsafe-inline' the browser drops every rule and the site renders
+      // unstyled. Scripts stay refused, which is what this policy is really guarding.
       "content-security-policy":
-        "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'none'; style-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
       "x-content-type-options": "nosniff",
     },
   });
