@@ -8,6 +8,7 @@ import {
   exchangeCode,
   getSsoConfig,
   loadJwks,
+  originFromHeaders,
   SSO_STATE_COOKIE,
   verifyIdToken,
 } from "@/lib/sso";
@@ -20,8 +21,8 @@ export const dynamic = "force-dynamic";
  * request's, because behind the deployment proxy the request arrives as an internal
  * host and a redirect to it would send the browser to a name that only exists here.
  */
-function back(config: { publicUrl: string }, reason: string) {
-  return NextResponse.redirect(new URL(`/signin?error=${reason}`, config.publicUrl));
+function back(base: string, reason: string) {
+  return NextResponse.redirect(new URL(`/signin?error=${reason}`, base));
 }
 
 /**
@@ -37,8 +38,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(fallback);
   }
 
+  // The browser has to land back on the name it started on: the deployment answers on
+  // more than one public name, and a cookie set on the other one leaves it signed out.
+  const origin = originFromHeaders(request.headers) ?? config.publicUrl;
+
   const stored = decodeState(request.cookies.get(SSO_STATE_COOKIE)?.value);
-  if (!stored) return back(config, "expired");
+  if (!stored) return back(origin, "expired");
 
   const { searchParams } = request.nextUrl;
   if (searchParams.get("error")) {
@@ -48,17 +53,17 @@ export async function GET(request: NextRequest) {
       searchParams.get("error"),
       (searchParams.get("error_description") ?? "").slice(0, 200),
     );
-    return back(config, "denied");
+    return back(origin, "denied");
   }
 
   const state = searchParams.get("state") ?? "";
   const code = searchParams.get("code") ?? "";
-  if (!code || state !== stored.state) return back(config, "expired");
+  if (!code || state !== stored.state) return back(origin, "expired");
 
   try {
     const discovery = await discover(config);
-    const tokens = await exchangeCode(config, discovery, code, stored.verifier);
-    if (!tokens.id_token) return back(config, "provider");
+    const tokens = await exchangeCode(config, discovery, code, stored.verifier, origin);
+    if (!tokens.id_token) return back(origin, "provider");
 
     const claims = await verifyIdToken(tokens.id_token, {
       issuer: discovery.issuer,
@@ -68,10 +73,10 @@ export async function GET(request: NextRequest) {
     });
 
     const email = (claims.email ?? "").trim().toLowerCase();
-    if (!email) return back(config, "no_email");
+    if (!email) return back(origin, "no_email");
 
     const company = getCompanyBySlug(getConfig().companySlug);
-    if (!company) return back(config, "not_allowed");
+    if (!company) return back(origin, "not_allowed");
 
     // The owner's address in this application, or an address the operator named in
     // OPENCO_SSO_ALLOWED_EMAILS for a single-owner company.
@@ -82,7 +87,7 @@ export async function GET(request: NextRequest) {
     }
     if (!member) {
       console.warn("[opencompany:sso] identity is not allowed to sign in");
-      return back(config, "not_allowed");
+      return back(origin, "not_allowed");
     }
 
     const session = createSession({
@@ -91,11 +96,11 @@ export async function GET(request: NextRequest) {
       userAgent: request.headers.get("user-agent"),
     });
 
-    const response = NextResponse.redirect(new URL(stored.next, config.publicUrl));
+    const response = NextResponse.redirect(new URL(stored.next, origin));
     response.cookies.set(SESSION_COOKIE, session.token, {
       httpOnly: true,
       sameSite: "lax",
-      secure: config.publicUrl.startsWith("https://"),
+      secure: origin.startsWith("https://"),
       path: "/",
       maxAge: Math.floor(SESSION_TTL_MS / 1000),
     });
@@ -104,6 +109,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("[opencompany:sso]", error);
-    return back(config, "provider");
+    return back(origin, "provider");
   }
 }

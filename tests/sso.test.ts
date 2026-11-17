@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, createSign, generateKeyPairSync } from "node:crypto";
 import test from "node:test";
-import { pkcePair, safeNext, verifyIdToken } from "../src/lib/sso";
+import { originFromHeaders, pkcePair, redirectUri, safeNext, verifyIdToken } from "../src/lib/sso";
 
 function b64url(value: Buffer | string): string {
   return Buffer.from(value).toString("base64url");
@@ -81,4 +81,42 @@ test("an unsigned token is refused outright", async () => {
   const none = b64url(JSON.stringify({ alg: "none", typ: "JWT" }));
   const body = b64url(JSON.stringify(valid));
   await assert.rejects(() => verifyIdToken(`${none}.${body}.`, options), /unsupported signature/);
+});
+
+test("the sign-in returns to the hostname the browser used", () => {
+  assert.equal(
+    originFromHeaders(new Headers({ host: "opencompany.innotel.site", "x-forwarded-proto": "https" })),
+    "https://opencompany.innotel.site",
+  );
+  assert.equal(originFromHeaders(new Headers({ host: "openco.innotel.tech:8443" })), "https://openco.innotel.tech:8443");
+});
+
+test("the forwarded name wins over the internal one behind a proxy", () => {
+  const headers = new Headers({
+    host: "192.168.1.52:3001",
+    "x-forwarded-host": "openco.innotel.tech",
+    "x-forwarded-proto": "https",
+  });
+  assert.equal(originFromHeaders(headers), "https://openco.innotel.tech");
+});
+
+test("a loopback, private or service name is not a public origin", () => {
+  const hosts = ["localhost:3000", "127.0.0.1:3000", "192.168.1.52:3001", "10.0.4.9", "172.20.0.2", "opencompany:3000"];
+  for (const host of hosts) assert.equal(originFromHeaders(new Headers({ host })), null, host);
+});
+
+test("the callback address follows the request, falling back to the configuration", () => {
+  const config = {
+    issuer: "https://auth.example/application/o/openco/",
+    clientId: "openco",
+    clientSecret: "secret",
+    publicUrl: "https://openco.innotel.tech",
+    allowedEmails: ["owner@example.com"],
+  };
+  assert.equal(redirectUri(config), "https://openco.innotel.tech/api/auth/sso/callback");
+  assert.equal(redirectUri(config, null), "https://openco.innotel.tech/api/auth/sso/callback");
+  assert.equal(
+    redirectUri(config, "https://opencompany.innotel.site/"),
+    "https://opencompany.innotel.site/api/auth/sso/callback",
+  );
 });

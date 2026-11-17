@@ -56,8 +56,44 @@ export function getSsoConfig(): SsoConfig | null {
   };
 }
 
-export function redirectUri(config: SsoConfig): string {
-  return `${config.publicUrl}/api/auth/sso/callback`;
+/**
+ * The origin the browser actually used, when it is a public one.
+ *
+ * The console is reachable under more than one name — the deployment's own domain and
+ * the public front's — and the sign-in has to come back to the name the person started
+ * on. A fixed origin sends the callback (and the session cookie) to the other name,
+ * so the browser arrives signed out of the site it came from. The proxy puts the name
+ * the browser used in the forwarded headers; a loopback, private or bare service name
+ * means there is no proxy in front of this request (local development, or a direct
+ * container call), and the configured public URL is then the only sensible answer.
+ */
+export function originFromHeaders(headers: Headers): string | null {
+  const host = (headers.get("x-forwarded-host") ?? headers.get("host") ?? "").split(",")[0]?.trim();
+  if (!host) return null;
+  const proto = (headers.get("x-forwarded-proto") ?? "").split(",")[0]?.trim() || "https";
+  if (proto !== "https" && proto !== "http") return null;
+  const hostname = host.replace(/:\d+$/, "").replace(/^\[|\]$/g, "").toLowerCase();
+  if (!hostname || isPrivateHostname(hostname)) return null;
+  return `${proto}://${host}`;
+}
+
+function isPrivateHostname(hostname: string): boolean {
+  if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) return true;
+  if (hostname === "::1" || hostname === "0.0.0.0") return true;
+  // A bare name with no dot is a container or service name, never a public domain.
+  if (!hostname.includes(".") && !hostname.includes(":")) return true;
+  if (/^127\./.test(hostname)) return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return true;
+  if (/^169\.254\./.test(hostname)) return true;
+  return false;
+}
+
+/** Where the identity provider sends the browser back: this origin, or the configured one. */
+export function redirectUri(config: SsoConfig, origin?: string | null): string {
+  const base = (origin?.trim() || config.publicUrl).replace(/\/+$/, "");
+  return `${base}/api/auth/sso/callback`;
 }
 
 let discoveryCache: { key: string; at: number; value: Discovery } | null = null;
@@ -130,12 +166,17 @@ export function decodeState(value: string | undefined): SsoState | null {
   }
 }
 
-export function authorizeUrl(config: SsoConfig, discovery: Discovery, state: SsoState): string {
+export function authorizeUrl(
+  config: SsoConfig,
+  discovery: Discovery,
+  state: SsoState,
+  origin?: string | null,
+): string {
   const challenge = createHash("sha256").update(state.verifier).digest("base64url");
   const url = new URL(discovery.authorization_endpoint);
   url.searchParams.set("client_id", config.clientId);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("redirect_uri", redirectUri(config));
+  url.searchParams.set("redirect_uri", redirectUri(config, origin));
   url.searchParams.set("scope", "openid email profile");
   url.searchParams.set("state", state.state);
   url.searchParams.set("nonce", state.nonce);
@@ -199,6 +240,7 @@ export async function exchangeCode(
   discovery: Discovery,
   code: string,
   verifier: string,
+  origin?: string | null,
 ): Promise<{ id_token?: string; access_token?: string }> {
   const basic = Buffer.from(`${config.clientId}:${config.clientSecret}`, "utf8").toString("base64");
   const response = await fetch(discovery.token_endpoint, {
@@ -210,7 +252,7 @@ export async function exchangeCode(
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: redirectUri(config),
+      redirect_uri: redirectUri(config, origin),
       code_verifier: verifier,
     }),
     cache: "no-store",
