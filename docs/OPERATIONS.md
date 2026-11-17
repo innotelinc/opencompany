@@ -372,6 +372,34 @@ journalctl -u opencompany-forward.service -n 30
 curl -fsS http://127.0.0.1:3000/api/health
 ```
 
+This is what i1 (192.168.1.113) runs as of 2026-11-17: the forward is `enabled` and
+`active`, `opencompany-web`, `opencompany-worker` and `opencompany-autodeploy.timer`
+are `disabled`, so the public domain answers from the container on i2 rather than
+from a second copy here. i1's `.data` is the database as it stood at the move, and
+`/root/oc-data-backup` holds that database plus the `.env` it ran with, for rollback.
+
+```sh
+curl -sS https://opencompany.innotel.site/api/health   # {"ok":true,…,"company":"northwind-studio"}
+```
+
+### Building the image without the deployment host
+
+A deployment builds in Coolify, on whichever host Coolify runs. That host cannot be
+given swap from inside the container, and its limits are the host's to set: `swapon`
+refuses a file on this filesystem ("it appears to have holes") and `memory.swap.max`
+is `0` and not writable, so a build that outgrows `memory.max` is killed as exit 137
+and the deployment is left failed. Set the headroom on the host, never in the image:
+`incus config set <container> limits.memory=8GiB`.
+
+The image also caps its own compile — `NODE_OPTIONS=--max-old-space-size=1280` with
+`experimental.cpus: 1`, `webpackBuildWorker` and `webpackMemoryOptimizations` in
+`next.config.mjs` — which builds this application at a ~1.92 GB peak instead of the
+2.01 GB that was being killed, so a smaller host can still deploy it.
+
+`.github/workflows/build-image.yml` builds the same image on GitHub's runners and
+pushes `ghcr.io/innotelinc/opencompany` (`sha` and `latest`) with a `gha` cache, so a
+host need not compile at all: point the application's build pack at that image.
+
 ### Moving the public port back to this host
 
 The cutover is reversible from i1, and its `.data` directory is the database as it
