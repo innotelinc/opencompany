@@ -8,6 +8,7 @@ import {
   listDeliverableVersions,
 } from "@/lib/domain/repo";
 import { resolveArtifactFile } from "@/lib/engine/artifacts";
+import { contentSecurityPolicy } from "@/lib/public-site/csp";
 import { rewritePublicUrls } from "@/lib/public-site/rewrite-urls";
 
 export const runtime = "nodejs";
@@ -97,11 +98,12 @@ export async function GET(
     headers: {
       "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream",
       "cache-control": "public, max-age=30",
-      // The published pages carry their own inline styles, so the policy has to allow
-      // them: without 'unsafe-inline' the browser drops every rule and the site renders
-      // unstyled. Scripts stay refused, which is what this policy is really guarding.
-      "content-security-policy":
-        "default-src 'none'; style-src 'unsafe-inline' 'self'; img-src 'self' data:; font-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
+      // The published pages carry their own styling, so the policy names the exact
+      // styles this page contains (one hash per block or attribute) instead of
+      // allowing inline styles wholesale.
+      "content-security-policy": contentSecurityPolicy(
+        typeof body === "string" ? body : undefined,
+      ),
       "x-content-type-options": "nosniff",
     },
   });
