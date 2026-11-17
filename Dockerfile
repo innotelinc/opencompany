@@ -4,6 +4,10 @@ FROM node:24-bookworm-slim
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# The build host can be small: `next build` was OOM-killed (exit 137) on a
+# 3.5 GB container with no swap. Cap the heap and build with one webpack
+# worker so a compile peaks near 2 GB instead of being killed.
+ENV NODE_OPTIONS=--max-old-space-size=1280
 
 # Build tools are a fallback for better-sqlite3 on unusual platforms. The cache
 # mounts keep apt from re-downloading the same packages on every deployment.
