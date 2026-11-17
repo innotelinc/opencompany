@@ -448,6 +448,9 @@ successor. Nothing creates or clones an application.
 Auto deploy must stay enabled in the application's settings for a delivery to start
 a build; the webhook alone does not override that.
 
+A failed build removes only the container it was about to start, so the version
+already serving keeps answering until a deployment succeeds.
+
 The timer below is the self-hosted alternative, disabled on i1 because Coolify owns
 deployments here.
 
