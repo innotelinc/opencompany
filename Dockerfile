@@ -4,6 +4,11 @@ FROM node:24-bookworm-slim
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# The build runs on the deployment host, which is smaller than a laptop: cap Node's
+# heap so `next build` garbage-collects instead of being killed by the kernel.
+ENV NODE_OPTIONS=--max-old-space-size=1536
+# Printed into the build log so a memory failure says how much the host had.
+RUN grep -E "MemTotal|SwapTotal" /proc/meminfo
 
 # Build tools are a fallback for better-sqlite3 on unusual platforms. The cache
 # mounts keep apt from re-downloading the same packages on every deployment.
