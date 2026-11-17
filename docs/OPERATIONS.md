@@ -400,6 +400,23 @@ The image also caps its own compile — `NODE_OPTIONS=--max-old-space-size=1280`
 pushes `ghcr.io/innotelinc/opencompany` (`sha` and `latest`) with a `gha` cache, so a
 host need not compile at all: point the application's build pack at that image.
 
+That workflow runs on every push to `main`; its first runs took 6m 8s and 3m 10s and
+published `ghcr.io/innotelinc/opencompany:<full sha>` and `:latest`. The package is
+publicly readable, so a host pulling it needs no registry credential — check with
+`docker manifest inspect ghcr.io/innotelinc/opencompany:latest`.
+
+To stop the host compiling, switch the application's build pack to **Docker Image**
+(Coolify → the application → General → Build Pack → Docker Image) with image
+`ghcr.io/innotelinc/opencompany` and tag `latest`, then deploy once. The API accepts
+the same two fields, `docker_registry_image_name` and `docker_registry_image_tag`, on
+`PATCH /api/v1/applications/{uuid}`, but its documented `build_pack` values do not
+include the image pack, so the panel is the reliable way to switch. After that a push
+only pulls the new image.
+
+Because the deployment record lives on the Coolify host, a deployment from here is
+confirmed by its effect: the `workerId` in `/api/health` names the running container
+and changes when the container is replaced.
+
 ### Moving the public port back to this host
 
 The cutover is reversible from i1, and its `.data` directory is the database as it
