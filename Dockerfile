@@ -26,7 +26,9 @@ RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 RUN npx playwright install --with-deps chromium
 
 COPY . .
-# Prints the headroom the build is about to work with, so an exit 137 is measurable.
+# One compile worker, and the headroom printed before building: an exit 137 here is
+# a measurement, not a guess.
+ENV OPENCOMPANY_BUILD_SINGLE_CPU=1
 RUN free -m || true
 RUN npm run build
 

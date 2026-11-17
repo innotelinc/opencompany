@@ -1,12 +1,16 @@
+/**
+ * The deployment host builds this image in a container that is tight on memory, so
+ * the Dockerfile sets OPENCOMPANY_BUILD_SINGLE_CPU. A host with headroom builds at
+ * full speed; the container trades build time for a peak that fits.
+ */
+const singleWorker = process.env.OPENCOMPANY_BUILD_SINGLE_CPU === "1";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ["better-sqlite3"],
   experimental: {
     serverActions: { bodySizeLimit: "4mb" },
-    // The deployment host builds this image in a container that is tight on memory.
-    // One compile worker trades build time for a peak that fits.
-    cpus: 1,
-    webpackBuildWorker: false,
+    ...(singleWorker ? { cpus: 1, webpackBuildWorker: false } : {}),
   },
   webpack: (config) => {
     // CopilotKit's generative-UI entry imports maps support that this app does
