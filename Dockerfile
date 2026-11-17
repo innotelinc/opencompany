@@ -4,11 +4,6 @@ FROM node:24-bookworm-slim
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-# The build runs on the deployment host, which is smaller than a laptop: cap Node's
-# heap so `next build` garbage-collects instead of being killed by the kernel.
-ENV NODE_OPTIONS=--max-old-space-size=1536
-# Printed into the build log so a memory failure says how much the host had.
-RUN grep -E "MemTotal|SwapTotal" /proc/meminfo
 
 # Build tools are a fallback for better-sqlite3 on unusual platforms. The cache
 # mounts keep apt from re-downloading the same packages on every deployment.
@@ -26,10 +21,6 @@ RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 RUN npx playwright install --with-deps chromium
 
 COPY . .
-# One compile worker, and the headroom printed before building: an exit 137 here is
-# a measurement, not a guess.
-ENV OPENCOMPANY_BUILD_SINGLE_CPU=1
-RUN free -m || true
 RUN npm run build
 
 ENV NODE_ENV=production
