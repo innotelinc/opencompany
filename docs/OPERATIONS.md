@@ -430,9 +430,26 @@ and a changed artifact invalidates the approval hash.
 
 ### Auto-deploy on push
 
-This installation no longer uses it: the timer is disabled on i1 and Coolify on i2
-owns deployments, so nothing builds a second copy. The self-hosted path is kept
-documented for a box that runs the application itself.
+A push to `main` rebuilds the same Coolify application in place. The repository has
+one GitHub webhook, `push` only:
+
+```
+https://deploy.innotel.us/webhooks/source/github/events/manual
+```
+
+`deploy.innotel.us` is the public front's route to Coolify; it proxies to
+`192.168.1.113:8000`, which forwards to Coolify on `192.168.1.52:8000`. Coolify
+matches the delivery to the application by repository (`innotelinc/opencompany`) and
+branch (`main`), checks the `X-Hub-Signature-256` HMAC against the application's
+`manual_webhook_secret_github`, and queues a normal deployment of that application —
+same uuid, same domain, same `.data` volume, one container replaced by its
+successor. Nothing creates or clones an application.
+
+Auto deploy must stay enabled in the application's settings for a delivery to start
+a build; the webhook alone does not override that.
+
+The timer below is the self-hosted alternative, disabled on i1 because Coolify owns
+deployments here.
 
 `bash deploy/install-auto-deploy.sh` (once, as root) installs
 `/usr/local/bin/opencompany-autodeploy` and a systemd timer that runs it every
