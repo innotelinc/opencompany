@@ -22,6 +22,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/signin?error=not_configured", request.url));
   }
 
+  // Behind the deployment proxy the request arrives as an internal host; anything the
+  // browser is sent to afterwards must be the public origin instead.
+  const publicUrl = config.publicUrl;
+
   const state = newState(request.nextUrl.searchParams.get("next"));
   try {
     const discovery = await discover(config);
@@ -36,6 +40,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("[opencompany:sso]", error);
-    return NextResponse.redirect(new URL("/signin?error=provider", request.url));
+    return NextResponse.redirect(new URL("/signin?error=provider", publicUrl));
   }
 }
