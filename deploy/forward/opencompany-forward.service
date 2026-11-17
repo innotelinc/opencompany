@@ -1,0 +1,17 @@
+[Unit]
+Description=OpenCompany public port forward (:3000 to the application on i2)
+Documentation=https://github.com/innotelinc/opencompany/blob/main/docs/OPERATIONS.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=FORWARD_PORT=3000
+Environment=FORWARD_HOST=192.168.1.52
+Environment=FORWARD_TARGET_PORT=3001
+ExecStart=/usr/bin/env node /usr/local/bin/opencompany-forward.mjs
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -345,11 +345,49 @@ because the caller is usually the container being replaced;
 
 Only one host runs the application, and here it is i2: Coolify runs it as one
 container with the `opencompany-data` volume and publishes port 3001. The public
-front still forwards to i1 on port 3000, so i1 runs `opencompany-forward.service`
-(`/usr/local/bin/opencompany-forward.mjs`), a plain TCP forward to `192.168.1.52:3001`.
-That keeps one public origin and one copy of the application; i1's
-`opencompany-web`, `opencompany-worker` and `opencompany-autodeploy.timer` are
-disabled, and its `.data` directory stays as it was for rollback.
+front still forwards to i1 on port 3000, so i1 runs `opencompany-forward.service`,
+a plain TCP forward to `192.168.1.52:3001`. That keeps one public origin and one copy
+of the application; i1's `opencompany-web`, `opencompany-worker` and
+`opencompany-autodeploy.timer` are disabled, and its `.data` directory stays as it
+was for rollback.
+
+The forward lives in this repository, so a rebuilt host gets the public path back:
+
+```sh
+bash deploy/install-forward.sh --take-over   # once, as root, from a checkout
+```
+
+It installs `deploy/forward/opencompany-forward.mjs` as
+`/usr/local/bin/opencompany-forward.mjs` and the unit as
+`/etc/systemd/system/opencompany-forward.service`, stops the local web, worker and
+auto-deploy timer, then proves `/api/health` answers through the forward. Without
+`--take-over` it never stops the local application; if port 3000 is taken it fails
+and says so rather than taking the site down. `FORWARD_HOST` and
+`FORWARD_TARGET_PORT` override the destination. After a rebuild, this service is the
+only thing between the public domain and the application, so check it first:
+
+```sh
+systemctl status opencompany-forward.service
+journalctl -u opencompany-forward.service -n 30
+curl -fsS http://127.0.0.1:3000/api/health
+```
+
+### Moving the public port back to this host
+
+The cutover is reversible from i1, and its `.data` directory is the database as it
+stood at the move:
+
+```sh
+systemctl disable --now opencompany-forward.service
+systemctl enable --now opencompany-web.service opencompany-worker.service opencompany-autodeploy.timer
+```
+
+Anything the company did after the move lives in the `opencompany-data` volume on
+i2, not on i1, so copy the database across before rolling back if that work matters.
+i1's `.env` names the deployment centre it would talk to: `COOLIFY_BASE_URL`,
+`COOLIFY_APP_UUID` and `COOLIFY_TOKEN` point at the i2 instance and its application,
+and `OPENCOMPANY_DEPLOY_PROVIDER=none` because that host serves itself. The old
+192.168.1.113 values were stale and have been replaced.
 
 Coolify's own Traefik could not start on i2 because oauth2-proxy already owns host
 port 8080, which is why the application publishes a port instead of a domain. If
