@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth";
 import { getConfig } from "@/lib/config";
 import { getCompanyBySlug, getHumanMemberByEmail, getPasswordHash } from "@/lib/domain/repo";
+import { getSsoConfig } from "@/lib/sso";
 import { fail, readJson, unexpected } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -31,6 +32,12 @@ function attemptKey(request: Request, email: string): string {
 
 export async function POST(request: Request) {
   try {
+    // Once single sign-on is configured this route is not a second way in: the
+    // console's own password no longer authenticates anyone.
+    if (getSsoConfig()) {
+      return fail("This console signs in through Cerulean single sign-on.", 403);
+    }
+
     const body = await readJson<{ email?: string; password?: string; next?: string }>(request);
     const email = body.email?.trim() ?? "";
     const password = body.password ?? "";

@@ -269,6 +269,14 @@ export function getHumanMemberByEmail(companyId: string, email: string): HumanMe
   return r ? mapHumanMember(r) : null;
 }
 
+/** Everyone in the company who can be signed in as. */
+export function listHumanMembers(companyId: string): HumanMember[] {
+  return getDb()
+    .prepare("SELECT * FROM human_members WHERE company_id = ? ORDER BY email ASC")
+    .all(companyId)
+    .map(mapHumanMember);
+}
+
 /** The stored scrypt hash, never the password. */
 export function getPasswordHash(memberId: string): string | null {
   const r = getDb().prepare("SELECT password_hash FROM human_members WHERE id = ?").get(memberId) as
