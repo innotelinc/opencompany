@@ -38,6 +38,7 @@ import {
   heartbeatRun,
   recordActivity,
   recordRunEvent,
+  rescheduleRoutine,
   setComputerStatus,
   setDeliverableStatus,
   setEmployeeStatus,
@@ -63,7 +64,7 @@ import { approvedExternalActions, executeExternalAction, recoverStaleExternalAct
 import { deploymentTargetLabel } from "@/lib/engine/deploy-target";
 import { planDeployDecision } from "@/lib/engine/deploy-decision";
 import type { AgentRunResult, PlanProposal } from "@/lib/engine/types";
-import type { Company, Employee, Goal, Project, Task, TaskRun } from "@/lib/domain/types";
+import type { Company, Deliverable, Employee, Goal, Project, Task, TaskRun } from "@/lib/domain/types";
 
 export interface TickResult {
   workerId: string;
@@ -150,12 +151,46 @@ export function recoverInterruptedRuns(companyId: string): number {
 // Routines
 // ---------------------------------------------------------------------------
 
+/** A task a routine started, recognised by the key that keeps each cycle unique. */
+function isRoutinePass(task: Task): boolean {
+  return (task.idempotencyKey ?? "").startsWith("routine:");
+}
+
+/** The routine's current pass, while that pass is still in flight. */
+function openRoutinePass(companyId: string, routineId: string): Task | undefined {
+  const prefix = `routine:${routineId}:`;
+  return listTasks(companyId).find(
+    (task) =>
+      (task.idempotencyKey ?? "").startsWith(prefix) &&
+      ["pending", "running", "awaiting_review", "awaiting_approval"].includes(task.status),
+  );
+}
+
 function runDueRoutines(companyId: string): string[] {
   const created: string[] = [];
   const now = Date.now();
   for (const routine of listRoutines(companyId)) {
     if (!routine.enabled || !routine.assigneeId) continue;
     if (Date.parse(routine.nextRunAt) > now) continue;
+    const unsettled = openRoutinePass(companyId, routine.id);
+    if (unsettled) {
+      // The previous pass has not settled yet. Stacking another behind it is how
+      // one routine became a queue of identical entries: skip this cycle and let
+      // the next one start once the pass in flight is done.
+      rescheduleRoutine(
+        companyId,
+        routine.id,
+        new Date(now + routine.intervalMinutes * 60_000).toISOString(),
+      );
+      recordActivity({
+        companyId,
+        actorType: "system",
+        type: "routine.skipped",
+        summary: `Routine "${routine.name}" skipped: its previous pass is still ${unsettled.status}.`,
+        taskId: unsettled.id,
+      });
+      continue;
+    }
     const task = createTask({
       companyId,
       title: routine.name,
@@ -1131,6 +1166,15 @@ function handleWork(input: {
     return;
   }
 
+  // A routine's pass is recurring maintenance of one standing deliverable, and its
+  // own checks are the gate (a public-site pass clears every site check). It is
+  // applied here directly, so a cycle cannot leave another `awaiting_review` row
+  // behind for a reviewer to work through later.
+  if (isRoutinePass(task)) {
+    applyRoutinePass({ companyId, task, deliverable, version: nextVersion, checks, result });
+    return;
+  }
+
   const reviewer = reviewEmployeeFor(companyId, employee);
   if (!reviewer) {
     updateTask(companyId, task.id, {
@@ -1168,6 +1212,43 @@ function handleWork(input: {
     taskId: task.id,
     projectId: task.projectId,
   });
+}
+
+/**
+ * Apply a routine's output instead of queueing a review of it.
+ *
+ * Recurring passes produce the same deliverable version after version; asking a
+ * second employee to re-approve each cycle added one review entry per cycle and
+ * resolved none of them. The checks are the gate, the version is recorded, and a
+ * website deliverable is published exactly as a passed review would publish it.
+ */
+function applyRoutinePass(input: {
+  companyId: string;
+  task: Task;
+  deliverable: Deliverable;
+  version: number;
+  checks: ReturnType<typeof runChecks>;
+  result: TickResult;
+}) {
+  const { companyId, task, deliverable, version, checks, result } = input;
+  setDeliverableStatus(companyId, deliverable.id, "approved");
+  updateTask(companyId, task.id, { status: "completed", blockedReason: null });
+  result.completed.push(task.id);
+  recordActivity({
+    companyId,
+    actorType: "system",
+    type: "routine.applied",
+    summary: `Routine "${task.title}" applied ${deliverable.name} v${version}: ${checks.length} check(s) passed, so no review was queued.`,
+    taskId: task.id,
+    projectId: task.projectId,
+    payload: { deliverableId: deliverable.id, version },
+  });
+  if (deliverable.kind === "website") {
+    // The same approval a passed review would have produced: served here, so the
+    // checked version is the one visitors get.
+    requestDeploymentDecision(companyId, task, deliverable.id, version);
+  }
+  maybeQueueReport(companyId, task.projectId);
 }
 
 function handleReview(input: {

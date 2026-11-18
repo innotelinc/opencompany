@@ -1904,6 +1904,16 @@ export function updateRoutineAfterRun(companyId: string, id: string, nextRunAt: 
     .run(nowIso(), nextRunAt, companyId, id);
 }
 
+/**
+ * Move a routine's next run without recording one. A cycle skipped because its
+ * previous pass has not settled did not run, so `last_run_at` stays as it was.
+ */
+export function rescheduleRoutine(companyId: string, id: string, nextRunAt: string): void {
+  getDb()
+    .prepare("UPDATE routines SET next_run_at = ? WHERE company_id = ? AND id = ?")
+    .run(nextRunAt, companyId, id);
+}
+
 export function acquireLease(name: string, owner: string, seconds: number): boolean {
   const now = nowIso();
   const expires = new Date(Date.now() + seconds * 1000).toISOString();

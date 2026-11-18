@@ -94,6 +94,14 @@ Workers only claim tasks whose dependencies are `completed` (a work task
 review task, which is created after delivery). Completion is decided by the
 server: deliverable exists, required checks passed, independent review passed.
 
+A routine's pass is the one exception to that review step: it is the same standing
+deliverable, version after version, and its own checks are the gate (a public-site
+pass must clear every site check). When they pass, the version is applied directly —
+the task is completed, the deliverable approved, and a website deliverable published
+the way a passed review publishes it — so a cycle cannot leave an `awaiting_review`
+entry behind. A routine also skips a scheduled cycle while its previous pass is
+still in flight (recorded as `routine.skipped`), so identical passes cannot stack.
+
 ### Delegation limits
 
 - Depth capped by policy `delegation.max_depth` (default 3).
