@@ -386,6 +386,11 @@ served from two copies at once. Nothing in this repository creates, clones or de
 a Coolify application; a second application with its own database behind the same
 domain is what went wrong here before.
 
+The application builds from the public GitHub repository `innotelinc/opencompany`,
+branch `main`: a push to `main` there delivers the repository webhook and deploys it.
+The copy at `git.innotel.us` is a mirror, not a second source — it is not what this
+application builds from, and a push to it deploys nothing.
+
 ```sh
 COOLIFY_BASE_URL=http://192.168.1.52:8000    # no trailing slash
 COOLIFY_TOKEN=…                              # server-side only
