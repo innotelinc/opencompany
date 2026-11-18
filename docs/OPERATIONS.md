@@ -134,12 +134,12 @@ to the owner member: its email must be that member's address, or be listed in
 else gets “That identity is not allowed to open this console”. The installation here
 allows `owner@openco.innotel.tech,admin@innotel.us`.
 
-In Authentik, the OAuth2 provider (slug `openco`, client id `openco`) carries
-`<OPENCO_PUBLIC_URL>/api/auth/sso/callback` as an authorization redirect and
-`<OPENCO_PUBLIC_URL>/signin` as a post-logout redirect, with grant types
-`authorization_code` and `refresh_token`. `OPENCO_PUBLIC_URL` must be the address the
-browser uses (`https://openco.innotel.tech`), because behind the deployment proxy the
-request arrives as an internal host.
+In Authentik, the OAuth2 provider (slug `openco`, client id `openco`) has to carry
+every public name's `/api/auth/sso/callback` as an authorization redirect and the same
+`/signin` as a post-logout redirect — here `https://openco.innotel.tech` and
+`https://opencompany.innotel.site` — with grant types `authorization_code` and
+`refresh_token`. Sign-in and sign-out both return to the name the browser used;
+`OPENCO_PUBLIC_URL` is the fallback when the request did not arrive through the proxy.
 
 Signing out — the sidebar button, `GET /api/auth/signout`, or revoking this browser in
 Administration — deletes the local session **and** sends the browser to Authentik's
