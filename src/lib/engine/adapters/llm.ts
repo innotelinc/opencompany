@@ -162,8 +162,9 @@ function toolDefinitions(input: AgentRunInput) {
       type: "function",
       function: {
         name: "finish",
-        description:
-          "Finish this task. Call exactly once when the work is done or you are blocked. Files must already be written with write_file.",
+        description: isAvailabilityWatchPass(input.task.title)
+          ? "Finish this availability observation. Call exactly once. Submit no deliverable: the server probes the site and records the observation, so summarize what you saw."
+          : "Finish this task. Call exactly once when the work is done or you are blocked. Files must already be written with write_file.",
         parameters: {
           type: "object",
           properties: {
@@ -232,8 +233,12 @@ function reviewFilesBlock(version: DeliverableVersion): string {
     .join("\n\n");
 }
 
+/** A watch pass reports availability; it is not a rebuild of the site. */
+const isAvailabilityWatchPass = (title: string) => /availability watch/i.test(title);
+
 function systemPrompt(input: AgentRunInput): string {
   const { employee, task, project, goal } = input;
+  const availabilityWatch = isAvailabilityWatchPass(task.title);
   return [
     `You are ${employee.name}, ${employee.title} at the company.`,
     `Standing role: ${employee.roleInstructions}`,
@@ -251,16 +256,24 @@ function systemPrompt(input: AgentRunInput): string {
     task.acceptanceCriteria.length
       ? `Acceptance criteria (all must hold):\n${task.acceptanceCriteria.map((criterion) => `- ${criterion}`).join("\n")}`
       : "Acceptance criteria: none beyond the checks.",
-    `Available checks: ${ALL_CHECKS.join(", ")}`,
-    `Checks that will run against your artifact: ${(task.requiredChecks.length ? task.requiredChecks : ALL_CHECKS).join(", ")}.`,
-    "A task is complete only when the stored artifact passes these checks, so satisfy them literally: name the customer, use each required section as an exact heading in written deliverables, avoid placeholder text, and include a form on contact pages.",
-    "Before calling finish, call run_checks and fix every failure it reports. If a check expects a landing-page headline, write index.html with an <h1> and the required sections; an explanatory report alone will not satisfy it.",
+    availabilityWatch
+      ? `This pass is an availability observation, not a build. Do not write, improve, submit or publish the site: the server probes it and records the observation with its own check, so anything you submit as a deliverable would become an unnecessary site version. Fetch ${process.env.OPENCOMPANY_PUBLIC_SITE_URL?.trim() || "the public site URL"}, confirm the status and that the real page answered rather than a holding page, and put what you saw — status, time and response — in your finish summary. Call finish with no deliverableName and no files.`
+      : `Available checks: ${ALL_CHECKS.join(", ")}`,
+    availabilityWatch
+      ? ""
+      : `Checks that will run against your artifact: ${(task.requiredChecks.length ? task.requiredChecks : ALL_CHECKS).join(", ")}.`,
+    availabilityWatch
+      ? ""
+      : "A task is complete only when the stored artifact passes these checks, so satisfy them literally: name the customer, use each required section as an exact heading in written deliverables, avoid placeholder text, and include a form on contact pages.",
+    availabilityWatch
+      ? ""
+      : "Before calling finish, call run_checks and fix every failure it reports. If a check expects a landing-page headline, write index.html with an <h1> and the required sections; an explanatory report alone will not satisfy it.",
     input.task.kind === "plan"
       ? `Produce a plan. Team you may assign: ${input.roster
           .map((member) => `${member.name} (${member.title})`)
           .join("; ")}. Every task needs explicit acceptance criteria. Keep it to the smallest plan that meets the goal. Assign each check only to the task that produces the artifact it inspects: HTML checks (files_exist, html_structure, balanced_tags, internal_links, stylesheet_present, accessibility_basics, customer_requirements_covered) belong on the website-build task, which must also require no_placeholder_text; research, review and operations report tasks should require files_exist and no_placeholder_text.`
       : "",
-    /public site/i.test(task.title)
+    /public site/i.test(task.title) && !availabilityWatch
       ? `This is the company's OWN public site, served at /site. Build OPENco.'s site from the "Public site brief" knowledge; do not continue a customer site and ignore unrelated files already in your workspace. Name the deliverable exactly "OPENco. public site". finish merges the files you write onto the last passing site, so improving one page is enough; keep every relative href valid and do not invent pages that will not exist.`
       : "",
     input.task.kind === "review"
@@ -535,15 +548,16 @@ export class LlmBackend implements AgentBackend {
                 if (!files.has(name)) files.set(name, body);
               }
             }
-            const results = runChecks(files, input.task.requiredChecks);
-            output =
-              results
-                .map((result) => `${result.passed ? "PASS" : "FAIL"} ${result.id}: ${result.detail}`)
-                .join("\n") +
-              `\n\n${results.filter((result) => result.passed).length}/${results.length} checks passed.` +
-              (files.size === 0
-                ? "\nNo files have been written this run yet; finish submits only files written during this run."
-                : `\nThese ${files.size} file(s) are what finish will submit: ${[...files.keys()].join(", ")}.`);
+            const results = isAvailabilityWatchPass(input.task.title) ? [] : runChecks(files, input.task.requiredChecks);
+            output = isAvailabilityWatchPass(input.task.title)
+              ? "This pass is an availability observation and produces no artifact, so it has no deliverable checks. Fetch the site, then call finish with your observation and no deliverableName."
+              : results
+                  .map((result) => `${result.passed ? "PASS" : "FAIL"} ${result.id}: ${result.detail}`)
+                  .join("\n") +
+                `\n\n${results.filter((result) => result.passed).length}/${results.length} checks passed.` +
+                (files.size === 0
+                  ? "\nNo files have been written this run yet; finish submits only files written during this run."
+                  : `\nThese ${files.size} file(s) are what finish will submit: ${[...files.keys()].join(", ")}.`);
           } else if (name === "run_command") {
             if (!input.employee.allowedTools.includes("terminal.exec")) throw new Error("terminal.exec is not granted.");
             const result = await input.workspace.runCommand(

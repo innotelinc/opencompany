@@ -593,9 +593,13 @@ workable.
 
 Two duties keep it online. `Public site: improvement pass` (hourly) rebuilds the
 site and only a version that passed its checks is served; `Public site:
-availability watch` (every fifteen minutes) asks `/api/public-site/health`
-whether the site answers and reports what it saw. `OPENCOMPANY_PUBLIC_SITE_URL`
-is what both check, defaulting to this app's own `/site`.
+availability watch` (every fifteen minutes) probes the same URL and records the
+probe — status, time, response — with its own `site_available` check as the
+pass's observation. The watch produces no site version and publishes nothing: a
+pass that only checked the site cannot change it. When the probe fails the pass
+records `site.down` with what it saw and still leaves the site untouched.
+`OPENCOMPANY_PUBLIC_SITE_URL` is what both use, defaulting to this app's own
+`/site`.
 
 Employee browsers are on by default (`OPENCOMPANY_BROWSER_ENABLED=1`) and the
 image installs Playwright's Chromium, so "Browser: not configured" cannot come

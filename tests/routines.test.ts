@@ -1,5 +1,7 @@
 import "./helpers";
 import assert from "node:assert/strict";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import test from "node:test";
 import {
   closeDb,
@@ -13,6 +15,7 @@ import {
   listEmployees,
   listRoutines,
   listTasks,
+  rescheduleRoutine,
 } from "../src/lib/domain/repo";
 import { workerTick } from "../src/lib/engine/orchestrator";
 import { seedCompany } from "../scripts/seed";
@@ -76,6 +79,58 @@ test("a routine's pass is applied when its checks pass, instead of queueing a re
   assert.ok(site, "the pass produces the standing public-site deliverable");
   assert.equal(site!.status, "approved");
   assert.equal(latestDeliverableVersion(companyId, site!.id)?.checksPassed, true);
+});
+
+test("an availability watch records its observation without producing or publishing a site version", async (t) => {
+  const companyId = seedCompany();
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html" });
+    response.end('<!DOCTYPE html><html lang="en"><head><title>OPENco.</title></head><body><h1>OPENco.</h1></body></html>');
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as AddressInfo;
+  process.env.OPENCOMPANY_PUBLIC_SITE_URL = `http://127.0.0.1:${address.port}/site`;
+  t.after(() => {
+    delete process.env.OPENCOMPANY_PUBLIC_SITE_URL;
+    server.close();
+    closeDb();
+    cleanup();
+  });
+
+  // The seeded company already has the watch routine; make its next cycle due now.
+  const routine = listRoutines(companyId).find((candidate) => candidate.name === "Public site: availability watch");
+  assert.ok(routine, "the seeded company has the availability watch routine");
+  rescheduleRoutine(companyId, routine!.id, new Date(Date.now() - 60_000).toISOString());
+
+  await advance(companyId, 2);
+
+  const passes = listTasks(companyId).filter((task) => (task.idempotencyKey ?? "").startsWith(`routine:${routine.id}:`));
+  assert.equal(passes.length, 1, "one due cycle starts one pass");
+  const pass = passes[0];
+  assert.equal(pass.status, "completed", `a watch pass completes, was ${pass.status}`);
+  assert.equal(pass.requiredChecks.length, 0, "a watch pass carries no artifact checks");
+
+  assert.equal(
+    listDeliverables(companyId).some((deliverable) => deliverable.name === "OPENco. public site"),
+    false,
+    "a watch pass must not produce a site version",
+  );
+
+  const activity = listActivity(companyId, 200);
+  assert.ok(
+    activity.some((event) => event.type === "routine.observed" && event.taskId === pass.id),
+    "the probe is recorded as the pass's observation",
+  );
+  assert.equal(
+    activity.some((event) => event.type === "site.published"),
+    false,
+    "a watch pass publishes nothing",
+  );
+  assert.equal(
+    listTasks(companyId).filter((task) => task.reviewOfTaskId === pass.id).length,
+    0,
+    "a watch pass queues no review entry",
+  );
 });
 
 test("a routine skips a cycle while its previous pass is still open", async (t) => {

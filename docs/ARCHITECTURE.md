@@ -102,6 +102,13 @@ the way a passed review publishes it — so a cycle cannot leave an `awaiting_re
 entry behind. A routine also skips a scheduled cycle while its previous pass is
 still in flight (recorded as `routine.skipped`), so identical passes cannot stack.
 
+An availability watch is a different kind of pass: it reports whether the site
+answers rather than changing it. It has no artifact and no artifact checks; the
+worker probes the URL itself, records the probe and a `site_available` check as
+the pass's observation (`routine.observed`, or `site.down` when the probe
+fails), and completes without creating a deliverable version or publishing
+anything.
+
 ### Delegation limits
 
 - Depth capped by policy `delegation.max_depth` (default 3).

@@ -508,6 +508,15 @@ export class DeterministicBackend implements AgentBackend {
       };
     }
 
+    // The availability watch observes whether the site answers; the orchestrator
+    // runs the probe and records it, so this pass builds no artifact.
+    if (input.task.kind === "work" && /availability watch/i.test(input.task.title)) {
+      return {
+        summary: "Checked whether the public site answers; the observation is recorded by the server.",
+        simulated: true,
+      };
+    }
+
     // Generic work task (including routines).
     if (input.task.kind === "work" && /routine|review|brief/i.test(input.task.title) && input.siblings.length > 0) {
       const body = `# ${input.task.title}\n\nPrepared by ${input.employee.name} (${input.employee.title}).\n\n## Context\n\n${input.task.description}\n\n## Findings\n\n- ${facts.customer} operates as a ${facts.industry}.\n- Required sections: ${facts.sections.join(", ")}.\n- Tone: ${facts.tone}.\n- Constraint: ${facts.notes}\n`;
@@ -527,7 +536,7 @@ export class DeterministicBackend implements AgentBackend {
 
     // The company's own public face. A dedicated generator so the site describes
     // the company rather than reusing customer-service copy.
-    if (input.task.kind === "work" && /public site/i.test(input.task.title)) {
+    if (input.task.kind === "work" && /public site/i.test(input.task.title) && !/availability watch/i.test(input.task.title)) {
       const files = publicSiteFiles(facts);
       for (const [name, body] of Object.entries(files)) input.workspace.writeFile(name, body);
       return {

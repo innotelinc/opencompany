@@ -57,6 +57,7 @@ import { evaluateAction } from "@/lib/policy";
 import { configureEmployeeBrowser } from "@/lib/computers/employee-browser";
 import { ComputerBusyError, EmployeeWorkspace } from "@/lib/computers/workspace";
 import { persistFiles, readArtifactFiles } from "@/lib/engine/artifacts";
+import { checkPublicSite } from "@/lib/public-site/uptime";
 import { ALL_CHECKS, checksPassed, runChecks } from "@/lib/engine/checks";
 import { DeterministicBackend } from "@/lib/engine/adapters/deterministic";
 import { LlmBackend, ProviderUnavailableError, RunStoppedError } from "@/lib/engine/adapters/llm";
@@ -64,7 +65,7 @@ import { approvedExternalActions, executeExternalAction, recoverStaleExternalAct
 import { deploymentTargetLabel } from "@/lib/engine/deploy-target";
 import { planDeployDecision } from "@/lib/engine/deploy-decision";
 import type { AgentRunResult, PlanProposal } from "@/lib/engine/types";
-import type { Company, Deliverable, Employee, Goal, Project, Task, TaskRun } from "@/lib/domain/types";
+import type { CheckResult, Company, Deliverable, Employee, Goal, Project, Task, TaskRun } from "@/lib/domain/types";
 
 export interface TickResult {
   workerId: string;
@@ -156,6 +157,14 @@ function isRoutinePass(task: Task): boolean {
   return (task.idempotencyKey ?? "").startsWith("routine:");
 }
 
+/**
+ * The availability watch observes whether the site answers; it does not rebuild
+ * the site. Its pass therefore has no artifact and no artifact checks.
+ */
+function isAvailabilityWatch(name: string): boolean {
+  return /availability watch/i.test(name);
+}
+
 /** The routine's current pass, while that pass is still in flight. */
 function openRoutinePass(companyId: string, routineId: string): Task | undefined {
   const prefix = `routine:${routineId}:`;
@@ -199,7 +208,10 @@ function runDueRoutines(companyId: string): string[] {
       assigneeId: routine.assigneeId,
       acceptanceCriteria: [routine.instructions],
       // A public-site pass must clear the full site bar, not just the baseline.
-      requiredChecks: /public site/i.test(routine.name) ? [...ALL_CHECKS] : [],
+      // The availability watch is the exception: it reports an observation, not an
+      // artifact, so asking it for the site checks is what pushed it to re-submit
+      // (and publish) the whole site every fifteen minutes.
+      requiredChecks: isAvailabilityWatch(routine.name) ? [] : /public site/i.test(routine.name) ? [...ALL_CHECKS] : [],
       status: "pending",
       idempotencyKey: `routine:${routine.id}:${routine.nextRunAt}`,
     });
@@ -762,7 +774,7 @@ export async function executeClaimedRun(input: {
       handleReview({ companyId, task, employee, outcome, result });
       setEmployeeStatus(companyId, employee.id, "idle");
     } else {
-      handleWork({ companyId, task, employee, outcome, run, result });
+      await handleWork({ companyId, task, employee, outcome, run, result });
       setEmployeeStatus(companyId, employee.id, "idle");
     }
 
@@ -1065,15 +1077,19 @@ function handlePlan(input: {
 // Work + review
 // ---------------------------------------------------------------------------
 
-function handleWork(input: {
+async function handleWork(input: {
   companyId: string;
   task: Task;
   employee: Employee;
   outcome: AgentRunResult;
   run: TaskRun;
   result: TickResult;
-}) {
+}): Promise<void> {
   const { companyId, task, employee, outcome, run, result } = input;
+  if (isRoutinePass(task) && isAvailabilityWatch(task.title)) {
+    await recordAvailabilityWatch({ companyId, task, employee, outcome, run, result });
+    return;
+  }
   if (!outcome.deliverable) {
     throw new Error("Work finished without a deliverable. An agent's claim of completion is not enough.");
   }
@@ -1249,6 +1265,57 @@ function applyRoutinePass(input: {
     requestDeploymentDecision(companyId, task, deliverable.id, version);
   }
   maybeQueueReport(companyId, task.projectId);
+}
+
+/**
+ * Record an availability watch's observation, and nothing else.
+ *
+ * The watch exists to notice whether the site answers, so the server's own probe
+ * is the report. Its pass used to run through the public-site path: it submitted
+ * the whole site as an artifact, so a fifteen-minute "check" produced a new site
+ * version and published it. Here the probe and its check are recorded, the task
+ * completes, and no deliverable version or deployment follows from it.
+ */
+async function recordAvailabilityWatch(input: {
+  companyId: string;
+  task: Task;
+  employee: Employee;
+  outcome: AgentRunResult;
+  run: TaskRun;
+  result: TickResult;
+}): Promise<void> {
+  const { companyId, task, employee, outcome, run, result } = input;
+  // An employee's claim is not an observation: the server checks, not the model.
+  const probe = await checkPublicSite(companyId);
+  const check: CheckResult = {
+    id: "site_available",
+    name: "The public site answers with the real page, not the holding page.",
+    passed: probe.ok,
+    detail: probe.detail,
+  };
+  const report = outcome.summary.trim();
+  recordRunEvent({
+    companyId,
+    runId: run.id,
+    taskId: task.id,
+    employeeId: employee.id,
+    type: "observation",
+    message: `${probe.url} at ${probe.checkedAt}: ${probe.detail}${report ? ` — ${report}` : ""}`,
+    payload: { probe, checks: [check] },
+  });
+  updateTask(companyId, task.id, { status: "completed", blockedReason: null });
+  result.completed.push(task.id);
+  recordActivity({
+    companyId,
+    actorType: "system",
+    type: probe.ok ? "routine.observed" : "site.down",
+    summary: probe.ok
+      ? `Routine "${task.title}" observed the public site answering ${probe.status ?? "?"} in ${probe.responseMs} ms; no site version was produced or published.`
+      : `Routine "${task.title}" found the public site down: ${probe.detail} No site version was produced or published.`,
+    taskId: task.id,
+    projectId: task.projectId,
+    payload: { probe, checks: [check] },
+  });
 }
 
 function handleReview(input: {
