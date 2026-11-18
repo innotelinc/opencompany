@@ -31,6 +31,11 @@ ENV NODE_ENV=production
 ENV OPENCOMPANY_DATA_DIR=/app/.data
 EXPOSE 3000
 
+# Container health: the app serves a public liveness route that needs no session.
+# Coolify reports "healthy" from this probe instead of "running:unknown".
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 # One container: migrate, optionally restore a snapshot, then run the worker beside
 # the web process against the same data volume. See deploy/docker-entrypoint.sh.
 CMD ["sh", "deploy/docker-entrypoint.sh"]
