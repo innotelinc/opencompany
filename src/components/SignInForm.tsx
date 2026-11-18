@@ -78,8 +78,13 @@ export function SignOutButton() {
       style={{ marginTop: 6 }}
       onClick={async () => {
         setBusy(true);
-        await fetch("/api/auth/signout", { method: "POST" }).catch(() => null);
-        window.location.assign("/signin");
+        // The response names the identity provider's sign-out when there is one, so the
+        // Cerulean session ends too instead of the next visit skipping the password.
+        const response = await fetch("/api/auth/signout", { method: "POST" }).catch(() => null);
+        const payload = response
+          ? ((await response.json().catch(() => ({}))) as { logoutUrl?: string | null })
+          : null;
+        window.location.assign(payload?.logoutUrl ?? "/signin");
       }}
     >
       {busy ? "Signing out…" : "Sign out"}

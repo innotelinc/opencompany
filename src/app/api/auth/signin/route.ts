@@ -12,7 +12,7 @@ import {
 } from "@/lib/auth";
 import { getConfig } from "@/lib/config";
 import { getCompanyBySlug, getHumanMemberByEmail, getPasswordHash } from "@/lib/domain/repo";
-import { getSsoConfig } from "@/lib/sso";
+import { getSsoConfig, passwordSigninAllowed } from "@/lib/sso";
 import { fail, readJson, unexpected } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -33,8 +33,9 @@ function attemptKey(request: Request, email: string): string {
 export async function POST(request: Request) {
   try {
     // Once single sign-on is configured this route is not a second way in: the
-    // console's own password no longer authenticates anyone.
-    if (getSsoConfig()) {
+    // console's own password no longer authenticates anyone. The one exception is an
+    // operator deliberately reopening it while Authentik is unavailable.
+    if (getSsoConfig() && !passwordSigninAllowed()) {
       return fail("This console signs in through Cerulean single sign-on.", 403);
     }
 

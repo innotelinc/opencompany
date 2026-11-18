@@ -81,14 +81,16 @@ export function createSession(input: {
   companyId: string;
   memberId: string;
   userAgent?: string | null;
+  /** The identity provider's token for this browser, if it signed in through one. */
+  idToken?: string | null;
 }): { token: string; expiresAt: string } {
   const token = randomBytes(32).toString("base64url");
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS).toISOString();
   getDb()
     .prepare(
-      `INSERT INTO auth_sessions (id, company_id, human_member_id, token_hash, created_at, expires_at, last_seen_at, user_agent)
-       VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO auth_sessions (id, company_id, human_member_id, token_hash, created_at, expires_at, last_seen_at, user_agent, id_token)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       newId("sess"),
@@ -99,6 +101,7 @@ export function createSession(input: {
       expiresAt,
       now.toISOString(),
       input.userAgent?.slice(0, 200) ?? null,
+      input.idToken ?? null,
     );
   return { token, expiresAt };
 }
@@ -162,6 +165,18 @@ export function revokeSessionById(memberId: string, sessionId: string): boolean 
 export function revokeSession(token: string): void {
   if (!token) return;
   getDb().prepare("DELETE FROM auth_sessions WHERE token_hash = ?").run(hashToken(token));
+}
+
+/**
+ * The identity provider's token for this browser, read before the session is deleted.
+ * Signing out hands it back so the provider ends its own session too.
+ */
+export function sessionIdentityToken(token: string): string | null {
+  if (!token) return null;
+  const row = getDb()
+    .prepare("SELECT id_token FROM auth_sessions WHERE token_hash = ?")
+    .get(hashToken(token)) as { id_token: string | null } | undefined;
+  return row?.id_token ?? null;
 }
 
 /** Sign out every other browser for this person, e.g. after a password change. */

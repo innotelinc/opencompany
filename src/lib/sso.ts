@@ -33,6 +33,7 @@ export interface Discovery {
   authorization_endpoint: string;
   token_endpoint: string;
   jwks_uri: string;
+  end_session_endpoint?: string;
 }
 
 export function getSsoConfig(): SsoConfig | null {
@@ -232,6 +233,51 @@ export async function verifyIdToken(
   if (claims.nonce !== options.nonce) throw new Error("The identity token does not belong to this sign-in.");
 
   return claims;
+}
+
+/**
+ * Where signing out has to go. The provider is given the identity token it issued for
+ * this browser, so it ends that session as well — clearing only the console's cookie
+ * would leave Cerulean signed in and skip the password on the next visit.
+ */
+export function buildEndSessionUrl(
+  config: SsoConfig,
+  discovery: Pick<Discovery, "end_session_endpoint">,
+  idToken: string | null,
+  origin?: string | null,
+): string | null {
+  if (!idToken || !discovery.end_session_endpoint) return null;
+  const base = (origin?.trim() || config.publicUrl).replace(/\/+$/, "");
+  const url = new URL(discovery.end_session_endpoint);
+  url.searchParams.set("id_token_hint", idToken);
+  url.searchParams.set("post_logout_redirect_uri", `${base}/signin`);
+  return url.toString();
+}
+
+/** The same, resolving the endpoint first; an unreachable provider never blocks sign-out. */
+export async function endSessionUrl(
+  config: SsoConfig | null,
+  idToken: string | null,
+  origin?: string | null,
+): Promise<string | null> {
+  if (!config || !idToken) return null;
+  try {
+    return buildEndSessionUrl(config, await discover(config), idToken, origin);
+  } catch (error) {
+    // The local session is already gone; at worst the person finishes signing out at
+    // Authentik itself, so this is a log line rather than a failed sign-out.
+    console.warn("[opencompany:sso] could not build the sign-out url", error);
+    return null;
+  }
+}
+
+/**
+ * Break-glass. While single sign-on is configured the console's own password is closed;
+ * an operator reopens it deliberately — `OPENCO_PASSWORD_SIGNIN=1` — for an outage, and
+ * closes it again afterwards. See docs/OPERATIONS.md, “When Cerulean is unavailable”.
+ */
+export function passwordSigninAllowed(): boolean {
+  return process.env.OPENCO_PASSWORD_SIGNIN === "1";
 }
 
 /** Exchange the one-time code for tokens, authenticating as this application. */

@@ -162,9 +162,9 @@ Licensing and upstream attribution: [docs/LICENSING.md](docs/LICENSING.md).
 
 **Not built (deliberate gaps for this version)**
 
-- Multi-user accounts. One owner signs in with a password (`npm run auth:password`),
-  sessions live in the database and every query is company-scoped, but there are no
-  invitations, roles or an external identity provider yet.
+- Multi-user accounts. One owner signs in — through Cerulean's Authentik when it is
+  configured, otherwise with the console's own password (`npm run auth:password`) —
+  and every query is company-scoped, but there are no invitations or roles yet.
 - Real public deployment, email or payments. Adapters return a clear `blocked`
   state; nothing is sent or published.
 - Browser sessions require optional Playwright and are off by default.

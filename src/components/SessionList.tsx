@@ -34,13 +34,19 @@ export function SessionList({ sessions, currentSessionId }: { sessions: SessionR
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id }),
       });
-      const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; revokedCurrent?: boolean };
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        revokedCurrent?: boolean;
+        logoutUrl?: string | null;
+      };
       if (!response.ok || !payload.ok) {
         setError(payload.error ?? `Could not revoke that session (${response.status}).`);
         return;
       }
       if (payload.revokedCurrent) {
-        window.location.assign("/signin");
+        // Ending this browser also ends its Cerulean session, when it had one.
+        window.location.assign(payload.logoutUrl ?? "/signin");
         return;
       }
       router.refresh();

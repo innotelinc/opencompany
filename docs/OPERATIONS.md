@@ -33,6 +33,10 @@ Copy `.env.example` to `.env`. Secrets belong in the server environment only.
 | `OPENCOMPANY_RUN_TIMEOUT_SECONDS` | 600 | Wall clock per run |
 | `OPENCOMPANY_RUN_LEASE_SECONDS` | 120 | Worker lease |
 | `OPENCOMPANY_BROWSER_ENABLED` | 0 | Requires Playwright + Chromium |
+| `OPENCO_PUBLIC_URL` | — | Address the browser uses, e.g. `https://openco.innotel.tech`; redirects use it because the request arrives from the proxy as an internal host |
+| `AUTHENTIK_ISSUER_URL` / `AUTHENTIK_CLIENT_ID` / `AUTHENTIK_CLIENT_SECRET` | — | Set all three to sign in through Cerulean's Authentik; the console's own password then answers 403 |
+| `OPENCO_SSO_ALLOWED_EMAILS` | `OPENCOMPANY_OWNER_EMAIL` | Comma-separated identities Authentik may present beyond the owner member's own address |
+| `OPENCO_PASSWORD_SIGNIN` | unset | `1` reopens the console password while Authentik is down — see “When Cerulean is unavailable” |
 
 Budget and plan policies live in the `policies` table (visible in
 Administration) and are enforced at dispatch, not in the UI.
@@ -115,7 +119,59 @@ not on the wire in clear.
 One human signs in: the company's owner, whose email is `OPENCOMPANY_OWNER_EMAIL`.
 There is no self-service registration and no second role yet.
 
-While signed in, Administration → Password changes it: it asks for the current
+### Cerulean single sign-on
+
+With `AUTHENTIK_ISSUER_URL`, `AUTHENTIK_CLIENT_ID` and `AUTHENTIK_CLIENT_SECRET` set,
+`/signin` offers only **Sign in with Cerulean**: the password is typed at
+`auth.cerulean.innotel.us`, and the console's own password form and
+`POST /api/auth/signin` are closed with 403 — they are not a second way in.
+
+The round trip is authorization code + PKCE. The state, nonce and verifier live in a
+short-lived `oc_sso` cookie, and the identity token's signature, issuer, audience,
+expiry and nonce are all checked before a session exists. The identity is then matched
+to the owner member: its email must be that member's address, or be listed in
+`OPENCO_SSO_ALLOWED_EMAILS` while the company has exactly one human member. Anything
+else gets “That identity is not allowed to open this console”. The installation here
+allows `owner@openco.innotel.tech,admin@innotel.us`.
+
+In Authentik, the OAuth2 provider (slug `openco`, client id `openco`) carries
+`<OPENCO_PUBLIC_URL>/api/auth/sso/callback` as an authorization redirect and
+`<OPENCO_PUBLIC_URL>/signin` as a post-logout redirect, with grant types
+`authorization_code` and `refresh_token`. `OPENCO_PUBLIC_URL` must be the address the
+browser uses (`https://openco.innotel.tech`), because behind the deployment proxy the
+request arrives as an internal host.
+
+Signing out — the sidebar button, `GET /api/auth/signout`, or revoking this browser in
+Administration — deletes the local session **and** sends the browser to Authentik's
+end-session endpoint with the identity token that opened it, so the next sign-in asks
+for the password again. If Authentik cannot be reached the local session still ends and
+the browser lands on `/signin`.
+
+### When Cerulean is unavailable
+
+The console's password is the emergency way in, and it is closed while single sign-on
+is configured. Open it deliberately, and close it again afterwards:
+
+1. Coolify → the application → Environment Variables: add `OPENCO_PASSWORD_SIGNIN=1`
+   and redeploy. `/signin` shows the password form under the Cerulean button, marked
+   as an emergency entry.
+2. If the owner has no password yet, set one inside the running container — it prompts,
+   and only the scrypt hash is stored:
+
+   ```
+   docker exec -it $(docker ps -qf name=<application uuid>) npm run auth:password -- owner@openco.innotel.tech
+   ```
+
+3. Sign in, do what the outage needs, then delete `OPENCO_PASSWORD_SIGNIN` and
+   redeploy. The 403 is back and the form is gone.
+
+Failed password sign-ins are counted per address and email; five in fifteen minutes
+answers 429 until the window passes.
+
+### The console's own password
+
+Without the three Authentik values — local development, a standalone install — the
+form is the way in. While signed in, Administration → Password changes it: it asks for the current
 password, refuses one under 10 characters, and signs other browsers out while keeping
 the one you typed it in. To set or reset it without signing in — the first time, or
 after a lockout — use the server:

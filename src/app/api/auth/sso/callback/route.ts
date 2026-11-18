@@ -94,6 +94,8 @@ export async function GET(request: NextRequest) {
       companyId: member.companyId,
       memberId: member.id,
       userAgent: request.headers.get("user-agent"),
+      // Kept so signing out can also end the session this token came from.
+      idToken: tokens.id_token,
     });
 
     const response = NextResponse.redirect(new URL(stored.next, origin));

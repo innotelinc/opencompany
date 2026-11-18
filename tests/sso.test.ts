@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { createHash, createSign, generateKeyPairSync } from "node:crypto";
 import test from "node:test";
-import { originFromHeaders, pkcePair, redirectUri, safeNext, verifyIdToken } from "../src/lib/sso";
+import {
+  buildEndSessionUrl,
+  originFromHeaders,
+  passwordSigninAllowed,
+  pkcePair,
+  redirectUri,
+  safeNext,
+  verifyIdToken,
+} from "../src/lib/sso";
 
 function b64url(value: Buffer | string): string {
   return Buffer.from(value).toString("base64url");
@@ -27,6 +35,47 @@ const valid = {
 };
 
 const options = { issuer: valid.iss, clientId: "openco", nonce: "nonce-value", jwks: { keys: [jwk] } };
+
+const ssoConfig = {
+  issuer: valid.iss,
+  clientId: "openco",
+  clientSecret: "secret",
+  publicUrl: "https://openco.innotel.tech",
+  allowedEmails: [],
+};
+
+const discovery = { end_session_endpoint: "https://auth.example/application/o/openco/end-session/" };
+
+test("signing out hands the identity token back to the provider", () => {
+  const url = new URL(buildEndSessionUrl(ssoConfig, discovery, "id-token") as string);
+  assert.equal(url.origin + url.pathname, "https://auth.example/application/o/openco/end-session/");
+  assert.equal(url.searchParams.get("id_token_hint"), "id-token");
+  assert.equal(url.searchParams.get("post_logout_redirect_uri"), "https://openco.innotel.tech/signin");
+});
+
+test("the provider sign-out returns to the name the browser used", () => {
+  const url = new URL(
+    buildEndSessionUrl(ssoConfig, discovery, "id-token", "https://opencompany.innotel.site") as string,
+  );
+  assert.equal(url.searchParams.get("post_logout_redirect_uri"), "https://opencompany.innotel.site/signin");
+});
+
+test("there is no provider sign-out without a token or an endpoint", () => {
+  assert.equal(buildEndSessionUrl(ssoConfig, discovery, null), null);
+  assert.equal(buildEndSessionUrl(ssoConfig, {}, "id-token"), null);
+});
+
+test("the console password stays closed unless the operator opens it", () => {
+  const previous = process.env.OPENCO_PASSWORD_SIGNIN;
+  delete process.env.OPENCO_PASSWORD_SIGNIN;
+  assert.equal(passwordSigninAllowed(), false);
+  process.env.OPENCO_PASSWORD_SIGNIN = "0";
+  assert.equal(passwordSigninAllowed(), false);
+  process.env.OPENCO_PASSWORD_SIGNIN = "1";
+  assert.equal(passwordSigninAllowed(), true);
+  if (previous === undefined) delete process.env.OPENCO_PASSWORD_SIGNIN;
+  else process.env.OPENCO_PASSWORD_SIGNIN = previous;
+});
 
 test("the PKCE challenge is the hash of the verifier", () => {
   const { verifier, challenge } = pkcePair();

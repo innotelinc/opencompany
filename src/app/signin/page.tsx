@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getConfig } from "@/lib/config";
-import { getSsoConfig } from "@/lib/sso";
+import { getSsoConfig, passwordSigninAllowed } from "@/lib/sso";
 import { SignInForm } from "@/components/SignInForm";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,9 @@ export default async function SignInPage({
   const email = getConfig().ownerEmail;
   const nextPath = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
   const message = error ? (SSO_ERRORS[error] ?? "The sign-in did not complete. Try again.") : null;
+  // Closed by default: only an operator who set OPENCO_PASSWORD_SIGNIN=1 for an outage
+  // sees the password form beside the Cerulean button.
+  const breakGlass = Boolean(sso) && passwordSigninAllowed();
 
   return (
     <div style={{ display: "grid", placeItems: "center", minHeight: "80vh" }}>
@@ -55,9 +58,19 @@ export default async function SignInPage({
                 {message}
               </p>
             ) : null}
+            {breakGlass ? (
+              <div style={{ marginTop: 18, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+                <p className="tiny" style={{ color: "var(--danger)", margin: "0 0 10px" }}>
+                  Emergency password sign-in is open (<span className="mono">OPENCO_PASSWORD_SIGNIN=1</span>).
+                  Use it only while Cerulean is unavailable, then remove that variable.
+                </p>
+                <SignInForm defaultEmail={email} nextPath={nextPath} />
+              </div>
+            ) : null}
             <p className="tiny faint" style={{ marginTop: 14, marginBottom: 0 }}>
-              Sessions last 30 days and can be ended from the sidebar. Accounts are managed in
-              Authentik at <span className="mono">auth.cerulean.innotel.us</span>.
+              Sessions last 30 days and can be ended from the sidebar; signing out also ends your
+              Cerulean session. Accounts are managed in Authentik at{" "}
+              <span className="mono">auth.cerulean.innotel.us</span>.
             </p>
           </>
         ) : (
