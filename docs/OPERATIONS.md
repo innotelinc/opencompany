@@ -392,12 +392,20 @@ The copy at `git.innotel.us` is a mirror, not a second source — it is not what
 application builds from, and a push to it deploys nothing.
 
 ```sh
-COOLIFY_BASE_URL=http://192.168.1.52:8000    # no trailing slash
+COOLIFY_BASE_URL=http://192.168.1.85:8000    # no trailing slash
 COOLIFY_TOKEN=…                              # server-side only
 COOLIFY_APP_UUID=…                           # the application uuid, not its name
 COOLIFY_APP_NAME=opencompany                 # label in the console
 OPENCOMPANY_DEPLOY_PROVIDER=coolify          # Coolify owns the running copy
 ```
+
+That address is the `coolify` container on 192.168.1.85, which is the console behind
+`deploy.innotel.us` and the only installation that deploys — its queue holds every
+build since 2026-11-20. A second Coolify (4.7.6, on the i2 host, publishing port
+8000) carried the same application uuid and domain but had not deployed since
+2026-11-18; it was stopped on 2026-11-20 after its database was dumped to
+`/root/oc-coolifyA-20261120T051159Z.sql.gz`, so one installation owns the records and
+nobody can rebuild the app from stale configuration.
 
 `POST /api/deployments/update` queues the same rebuild for a script or a monitor. It
 needs an owner session and returns the Coolify deployment uuid rather than waiting,
