@@ -14,7 +14,7 @@ import { getConfig } from "@/lib/config";
  * The token stays server-side. The browser only ever sees the console's own API.
  */
 export type CoolifyProvider = {
-  /** Base URL without a trailing slash, e.g. http://192.168.1.113:8000 */
+  /** Base URL without a trailing slash, e.g. http://192.168.1.85:8000 */
   baseUrl: string;
   token: string;
   /** Application uuid in Coolify, not the name. */
