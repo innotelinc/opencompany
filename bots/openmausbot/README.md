@@ -5,41 +5,41 @@
 open-source Grok Bot alternative: a chat app where every bot in the sidebar is a
 real agent with its own personality, model, cloud computer and connected apps. This
 folder is the integration point in this repository, not a fork — the code stays
-upstream's, and the tenant is deployed from its published image.
+upstream's, and the tenant runs the published image.
 
 ## What is here
 
 | File | Why |
 |---|---|
-| `compose.yaml` | the tenant Coolify runs: the harness server plus Caddy, over Unix sockets |
-| `Caddyfile` | the socket hop and the trusted-proxy header, copied from upstream `deploy/local` |
+| `compose.yaml` | the socket-based tenant (server plus Caddy), kept for a compose deployment |
+| `Caddyfile` | the socket hop and trusted-proxy header, copied from upstream `deploy/local` |
+| `README.md` | how the live application is configured |
 
-Nothing builds here. `compose.yaml` pulls
-`ghcr.io/milind-soni/openmausbot:${OMB_IMAGE}`; the panel pins the tag and records
-the deployed digest.
+Nothing builds here. The image is upstream's published release
+(`ghcr.io/milind-soni/openmausbot`).
 
-## Why two services for one bot server
+## How the live application runs
 
-OpenMausBot binds only `127.0.0.1` inside its container and publishes two Unix
-sockets. That loopback trust **is** its login model: a request on a socket is never
-a local one, so it needs a session, and the first browser sees the pairing page.
-Publishing the server's port directly would put an unauthenticated surface on the
-estate network. Caddy in the same volume, in front of those sockets, is upstream's
-answer and it is kept here unchanged.
+The Coolify application is a **Docker image** application, not a compose one: the
+panel's API creates compose applications with an empty compose body, so a compose
+deploy there fails before it starts. The live shape is a single container of the
+upstream image, with the edge terminating TLS:
 
-## Deploying it
+| Setting | Value | Why |
+|---|---|---|
+| image | `ghcr.io/milind-soni/openmausbot:latest` | upstream's release, 1.76 GB, pulled by the panel |
+| container port | `8799` | the harness server |
+| host port | `8801 → 8799` | what the estate edge forwards to |
+| `OMB_LAN` | `1` | without it the server binds only `127.0.0.1` inside the container; with it, it binds all interfaces and still refuses connections that are not from a private address |
+| `OMB_PUBLIC_URL`, `OMB_WEBHOOK_PUBLIC_URL` | `https://bot.innotel.site` | pairing links and hook URLs the server prints |
+| `OMB_SERVER_NAME` | `bot.innotel.site` | the name the desktop app shows |
+| edge vhost | `bot.innotel.site` → `192.168.1.52:8801`, `*.innotel.site` certificate, HTTP forced to HTTPS | same front door as every other name |
 
-The Coolify application uses this folder as its base directory with the
-`dockercompose` build pack:
-
-- **Repository** `innotelinc/opencompany`, branch `main`, base directory
-  `/bots/openmausbot`
-- **Domain** `bot.innotel.site`, container port `8080` (Caddy)
-- **Environment** `DOMAIN=bot.innotel.site`, `OMB_IMAGE=<pinned release tag>`,
-  `OMB_TRUSTED_PROXY_CIDRS=172.16.0.0/12 10.0.0.0/8 192.168.0.0/16`
-
-The name resolves to the estate edge, which terminates TLS and forwards to the
-application; the certificate is not Caddy's.
+`OMB_LAN=1` is the one deliberate compromise against upstream's loopback-trust
+model: it exists for a server reached over a LAN, and the listener still destroys
+any connection whose endpoints are not private. The estate edge and Coolify's
+network are private, so those pass; a public client cannot reach `:8799` without
+going through the edge.
 
 ## First sign-in
 
@@ -48,10 +48,15 @@ server and open it (or paste it into the desktop app's **＋ → Connect to a
 server**):
 
 ```sh
-docker compose exec omb openmausbot pair --label "First admin"
+docker exec <container> openmausbot pair --label "First admin"
 ```
 
 The link is an administrator credential until it is used or expires — treat it like
-a password. Signing in with an emailed code instead needs the SMTP settings on the
-server (`OMB_SIGNIN_SMTP_URL`, `OMB_SIGNIN_SMTP_FROM`) and the addresses allowed to
-use them (`OMB_SIGNIN_EMAILS`), documented upstream in `docs/self-hosting.md`.
+a password. Signing in with an emailed code instead needs `OMB_SIGNIN_SMTP_URL` and
+`OMB_SIGNIN_SMTP_FROM` plus the allowed addresses (`OMB_SIGNIN_EMAILS`), documented
+upstream in `docs/self-hosting.md`.
+
+## Health
+
+`GET https://bot.innotel.site/api/health` answers `{"app":"openmausbot"}` without a
+session; that is also the container health check.
