@@ -407,6 +407,11 @@ build since 2026-11-20. A second Coolify (4.7.6, on the i2 host, publishing port
 `/root/oc-coolifyA-20261120T051159Z.sql.gz`, so one installation owns the records and
 nobody can rebuild the app from stale configuration.
 
+The application's own copy of that address has to be the same URL, because it reaches
+the container as plain environment at deploy time: Coolify keeps it encrypted as the
+`COOLIFY_BASE_URL` variable, and a value of `http://127.0.0.1:8000` makes the console's
+deploy action call the container itself instead of the panel.
+
 `POST /api/deployments/update` queues the same rebuild for a script or a monitor. It
 needs an owner session and returns the Coolify deployment uuid rather than waiting,
 because the caller is usually the container being replaced;
