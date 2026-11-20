@@ -66,7 +66,8 @@ The seeded company is **OPENco.**, the AI company run by **Innotel Labs** (openc
 | Iris Kang | Chief Executive Officer | internal |
 | Dana Whitfield | Operations Manager | internal |
 | Rhea Okafor | Customer Researcher | internal |
-| Milo Vance | Web Developer | internal |
+| Milo Vance | Web Developer & Team Lead | internal |
+| Nova Reyes | Public Site Developer | internal |
 | Priya Raman | Quality Reviewer | internal |
 
 The owner submits: *“Prepare a small website for this customer using the

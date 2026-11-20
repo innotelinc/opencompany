@@ -76,6 +76,7 @@ export function seedCompany(options: { reset?: boolean } = {}) {
     operations: newId("dep"),
     research: newId("dep"),
     engineering: newId("dep"),
+    web: newId("dep"),
     quality: newId("dep"),
   };
 
@@ -102,6 +103,7 @@ export function seedCompany(options: { reset?: boolean } = {}) {
       operations: "Operations",
       research: "Research",
       engineering: "Engineering",
+      web: "Web",
       quality: "Quality",
     })) {
       conn
@@ -157,12 +159,12 @@ export function seedCompany(options: { reset?: boolean } = {}) {
 
   const developer = createEmployee({
     companyId,
-    departmentId: departmentIds.engineering,
+    departmentId: departmentIds.web,
     managerId: ops.id,
     name: "Milo Vance",
-    title: "Web Developer",
+    title: "Web Developer & Team Lead",
     roleInstructions:
-      "Build accessible static websites in your workspace. Keep every link local, run the checks, and ship files you would defend in review.",
+      "Lead the web team: build accessible static websites in your workspace, keep the shared component library and the public site's quality bar, and hand every artifact to someone who did not build it. Keep every link local, run the checks, and ship files you would defend in review.",
     backend: "deterministic",
     model: config.model,
     allowedTools: ["files.read", "files.write", "terminal.exec", "knowledge.read"],

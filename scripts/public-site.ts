@@ -11,6 +11,7 @@
  */
 import type { AppConfig } from "../src/lib/config";
 import { getConfig } from "../src/lib/config";
+import { getDb, newId, nowIso } from "../src/lib/db";
 import {
   createEmployee,
   createKnowledgeDoc,
@@ -37,22 +38,47 @@ const PUBLIC_SITE_KNOWLEDGE = [
   "Accent color: #d8a24a",
   "Notes: OPENco. by Innotel Labs. Owners set direction, budget and approvals; AI employees plan, build, check and review the work. Nothing external happens without the owner.",
   "Constraints: static files only; no trackers or external assets; the contact form must not claim a backend.",
+  "Web team: the web lead builds and ships the site; a separate reviewer signs off; the public site developer reports to the web lead.",
   "Availability: this site is the company's public face and must answer 24/7. Keep the last passing version online; never let an improvement pass take the site down.",
 ].join("\n");
+
+/**
+ * The web team is its own department. It is created on demand so an installation
+ * seeded before the restructure is repaired by the same idempotent call.
+ */
+function ensureWebDepartment(companyId: string, added: string[]): string {
+  const existing = listDepartments(companyId).find((department) => department.name === "Web");
+  if (existing) return existing.id;
+  const id = newId("dep");
+  getDb()
+    .prepare("INSERT INTO departments (id, company_id, name, charter, created_at) VALUES (?,?,?,?,?)")
+    .run(id, companyId, "Web", "Front-end build, the public site, and review handoffs.", nowIso());
+  added.push("department Web");
+  return id;
+}
 
 export function ensurePublicSiteFoundation(companyId: string, config: AppConfig = getConfig()): string[] {
   const added: string[] = [];
   const employees = listEmployees(companyId);
-  const departments = listDepartments(companyId);
-  const engineering = departments.find((department) => department.name === "Engineering") ?? null;
+  const webDepartmentId = ensureWebDepartment(companyId, added);
   const operationsManager = employees.find((employee) => /operations manager/i.test(employee.title)) ?? null;
+  const webLead = employees.find((employee) => /Web Developer/i.test(employee.title)) ?? null;
+
+  // The build role is the team lead: one person owns the web output, and the
+  // public site reports into that same owner instead of floating in Operations.
+  if (webLead && (webLead.departmentId !== webDepartmentId || !/Team Lead/i.test(webLead.title))) {
+    getDb()
+      .prepare("UPDATE employees SET department_id = ?, title = ?, updated_at = ? WHERE company_id = ? AND id = ?")
+      .run(webDepartmentId, "Web Developer & Team Lead", nowIso(), companyId, webLead.id);
+    added.push("web team lead");
+  }
 
   let developer = employees.find((employee) => employee.name === PUBLIC_SITE_EMPLOYEE) ?? null;
   if (!developer) {
     developer = createEmployee({
       companyId,
-      departmentId: engineering?.id ?? null,
-      managerId: operationsManager?.id ?? null,
+      departmentId: webDepartmentId,
+      managerId: webLead?.id ?? operationsManager?.id ?? null,
       name: PUBLIC_SITE_EMPLOYEE,
       title: "Public Site Developer",
       roleInstructions:
@@ -64,6 +90,16 @@ export function ensurePublicSiteFoundation(companyId: string, config: AppConfig 
       spendLimitCents: 80,
     });
     added.push(`employee ${developer.name}`);
+  }
+
+  // An installation seeded before the web team existed still has this person
+  // outside the department; move the reporting line when it does not match.
+  const targetManagerId = webLead?.id ?? operationsManager?.id ?? null;
+  if (developer.departmentId !== webDepartmentId || developer.managerId !== targetManagerId) {
+    getDb()
+      .prepare("UPDATE employees SET department_id = ?, manager_id = ?, updated_at = ? WHERE company_id = ? AND id = ?")
+      .run(webDepartmentId, targetManagerId, nowIso(), companyId, developer.id);
+    added.push("public site developer reporting line");
   }
 
   upsertComputer({
