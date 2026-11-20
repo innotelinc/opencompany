@@ -34,6 +34,13 @@ test("non-HTML files are served with the same narrowing", () => {
   assert.doesNotMatch(policy, /unsafe/);
 });
 
+test("the contact form may hand off to a mail client, and to nothing else", () => {
+  const policy = contentSecurityPolicy("<p>plain</p>");
+  assert.match(policy, /form-action 'mailto:'/);
+  // No wildcard, no http(s) origin: a submitted form cannot reach a server.
+  assert.doesNotMatch(policy, /form-action[^;]*(\*|https?:)/);
+});
+
 test("hashes are stable and de-duplicated per page", () => {
   const html = `<p style="a:1">x</p><p style="a:1">y</p><style>b{}</style><style>b{}</style>`;
   const { elements, attributes } = inlineStyleHashes(html);

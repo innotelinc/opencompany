@@ -52,7 +52,10 @@ export function contentSecurityPolicy(html?: string): string {
     `style-src ${style.join(" ")}`,
     "img-src 'self' data:",
     "font-src 'self'",
-    "form-action 'none'",
+    // The contact page posts to a mailto: address. `'none'` blocked that, so the
+    // button did nothing at all while the page told the visitor it would open their
+    // mail client. Only the scheme is named: a form still cannot reach a server.
+    "form-action 'mailto:'",
     "base-uri 'none'",
     "frame-ancestors 'none'",
   ].join("; ");
