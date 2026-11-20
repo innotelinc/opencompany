@@ -408,9 +408,8 @@ Only one host runs the application, and here it is i2: Coolify runs it as one
 container with the `opencompany-data` volume and publishes port 3001. The public
 front still forwards to i1 on port 3000, so i1 runs `opencompany-forward.service`,
 a plain TCP forward to `192.168.1.52:3001`. That keeps one public origin and one copy
-of the application; i1's `opencompany-web`, `opencompany-worker` and
-`opencompany-autodeploy.timer` are disabled, and its `.data` directory stays as it
-was for rollback.
+of the application; i1's application units and its old checkout were removed on
+2026-11-20 (see below), so only the forward remains.
 
 The forward lives in this repository, so a rebuilt host gets the public path back:
 
@@ -433,11 +432,11 @@ journalctl -u opencompany-forward.service -n 30
 curl -fsS http://127.0.0.1:3000/api/health
 ```
 
-This is what i1 (192.168.1.113) runs as of 2026-11-17: the forward is `enabled` and
-`active`, `opencompany-web`, `opencompany-worker` and `opencompany-autodeploy.timer`
-are `disabled`, so the public domain answers from the container on i2 rather than
-from a second copy here. i1's `.data` is the database as it stood at the move, and
-`/root/oc-data-backup` holds that database plus the `.env` it ran with, for rollback.
+This is what i1 (192.168.1.113) runs as of 2026-11-20: only the forward is `enabled`
+and `active`, so the public domain answers from the container on i2 rather than from
+a second copy here. The old checkout and its `.data` were removed on 2026-11-20;
+`/root/oc-data-backup` and the timestamped archive hold that database and the `.env`
+it ran with, for the record.
 
 ```sh
 curl -sS https://opencompany.innotel.site/api/health   # {"ok":true,…,"company":"northwind-studio"}
@@ -478,22 +477,26 @@ Because the deployment record lives on the Coolify host, a deployment from here 
 confirmed by its effect: the `workerId` in `/api/health` names the running container
 and changes when the container is replaced.
 
-### Moving the public port back to this host
+### The i1 copy was removed
 
-The cutover is reversible from i1, and its `.data` directory is the database as it
-stood at the move:
+The old checkout on i1 is gone as of 2026-11-20. Its database's newest row was
+`2026-11-17T10:09:16Z` — the move itself — while the Coolify copy was already at
+`2026-11-20T04:23Z`, so there was nothing to merge in either direction: the live
+volume was ahead in every table. What remains on i1 is the forward, which is the
+public path, plus these records:
 
 ```sh
-systemctl disable --now opencompany-forward.service
-systemctl enable --now opencompany-web.service opencompany-worker.service opencompany-autodeploy.timer
+/root/oc-duplicate-20261120T045645Z.tar.gz   # .data and .env as they were, mode 600
+/root/oc-duplicate-20261120T045645Z.commit   # the checkout's HEAD (5edc650)
+/root/oc-data-backup                          # the pre-move database and its .env
 ```
 
-Anything the company did after the move lives in the `opencompany-data` volume on
-i2, not on i1, so copy the database across before rolling back if that work matters.
-i1's `.env` names the deployment centre it would talk to: `COOLIFY_BASE_URL`,
-`COOLIFY_APP_UUID` and `COOLIFY_TOKEN` point at the i2 instance and its application,
-and `OPENCOMPANY_DEPLOY_PROVIDER=none` because that host serves itself. The old
-192.168.1.113 values were stale and have been replaced.
+`opencompany-forward.service` stays enabled and active, forwarding to
+`192.168.1.52:3001`. Its `/api/health` reports the same `workerId` as the public
+domain, which is how one copy is verified rather than assumed: two processes would
+never share that value. Rolling back to an i1-served application would mean
+restoring the archive and re-creating the units, because the archive is the record
+now, not a second deployment.
 
 Coolify's own Traefik could not start on i2 because oauth2-proxy already owns host
 port 8080 (it also wants 80 and 443), which is why the application publishes a port
