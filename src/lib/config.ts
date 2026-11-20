@@ -48,6 +48,15 @@ export function getConfig() {
         appName: process.env.COOLIFY_APP_NAME?.trim() || "opencompany",
       },
     },
+    // Reaching the owner when a decision is waiting. The popup is the live
+    // channel; these settings decide when an email takes over, where its link
+    // points, and the secret that makes the link unforgeable.
+    approvals: {
+      secret: process.env.OPENCOMPANY_APPROVAL_SECRET?.trim() ?? "",
+      baseUrl: (process.env.OPENCOMPANY_BASE_URL ?? process.env.OPENCO_BASE_URL ?? "http://localhost:3000").replace(/\/+$/, ""),
+      emailAfterSeconds: num(process.env.OPENCOMPANY_APPROVAL_EMAIL_AFTER_SECONDS, 120),
+      linkTtlHours: num(process.env.OPENCOMPANY_APPROVAL_LINK_TTL_HOURS, 72),
+    },
     limits: {
       // The budget is yearly. It is measured monthly and adjusted quarterly on
       // performance; the older monthly variable is read as a yearly figure only

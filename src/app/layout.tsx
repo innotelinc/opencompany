@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import "./approvals.css";
 import { tryGetSession } from "@/lib/session";
 import { getConfig, liveModelConfigured } from "@/lib/config";
 import { listDecisions } from "@/lib/domain/repo";
 import { workerStatus } from "@/lib/domain/ops";
 import LiveStrip from "@/components/LiveStrip";
+import ApprovalPopup from "@/components/ApprovalPopup";
 import { SignOutButton } from "@/components/SignInForm";
 import { NavLink } from "@/components/NavLink";
 
@@ -69,6 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </aside>
           <main className="main">
             {session ? <LiveStrip /> : null}
+            {session ? <ApprovalPopup /> : null}
             {children}
           </main>
         </div>

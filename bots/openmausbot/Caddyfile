@@ -1,0 +1,27 @@
+:80 {
+	encode zstd gzip
+	handle /hooks/* {
+		reverse_proxy unix//run/openmausbot/hooks.sock
+	}
+	# HTTPS is terminated by the estate edge, which forwards here over the private
+	# network. Requests from that range may claim the HTTPS hostname; anything else
+	# is plain HTTP.
+	@trusted_https {
+		host {$OMB_HTTPS_HOST:https-disabled.invalid}
+		remote_ip {$OMB_TRUSTED_PROXY_CIDRS}
+	}
+	handle @trusted_https {
+		reverse_proxy unix//run/openmausbot/http.sock {
+			header_up X-Forwarded-Proto https
+			header_up -Accept-Encoding
+			flush_interval -1
+		}
+	}
+	handle {
+		reverse_proxy unix//run/openmausbot/http.sock {
+			header_up X-Forwarded-Proto http
+			header_up -Accept-Encoding
+			flush_interval -1
+		}
+	}
+}

@@ -1,0 +1,65 @@
+# OpenMausBot as this estate's bot server, deployed by Coolify at bot.innotel.site.
+#
+# Upstream ships this shape in deploy/docker-compose.yml: the harness server holds
+# no public port and Caddy reaches it over Unix sockets in a shared volume. That
+# loopback/socket trust is the server's auth model, so the two services stay
+# together here — one application, one data volume, one name.
+#
+#   docker compose pull && docker compose up -d
+#
+# The image is upstream's published release, pinned by tag here and by digest in
+# the panel. Nothing in this folder builds OpenMausBot; the source lives at
+# https://github.com/innotelinc/OpenMausBot (upstream milind-soni/OpenMausBot).
+
+name: ${COMPOSE_PROJECT_NAME:-openmausbot}
+
+services:
+  omb:
+    image: ${OMB_IMAGE:-ghcr.io/milind-soni/openmausbot:latest}
+    init: true
+    shm_size: "512m"
+    restart: unless-stopped
+    volumes:
+      - omb-data:/data
+      - omb-edge:/run/openmausbot
+    environment:
+      OMB_PORT: "8799"
+      OMB_WEBHOOK_PORT: "8800"
+      OMB_TUNNEL_SOCKET: /run/openmausbot/http.sock
+      OMB_WEBHOOK_SOCKET: /run/openmausbot/hooks.sock
+      OMB_SERVER_NAME: ${DOMAIN:-bot.innotel.site}
+      OMB_PUBLIC_URL: https://${DOMAIN:-bot.innotel.site}
+      OMB_WEBHOOK_PUBLIC_URL: https://${DOMAIN:-bot.innotel.site}
+      # Phones pair through the relay; the desktop app and browser pair by link.
+      OMB_PHONE_RELAY: ${OMB_PHONE_RELAY:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8799/api/health', { signal: AbortSignal.timeout(4000) }).then(async r => { if (!r.ok || !(await r.text()).includes('openmausbot')) process.exit(1); }).catch(() => process.exit(1))"
+      interval: 20s
+      timeout: 6s
+      start_period: 60s
+      retries: 5
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2}
+    restart: unless-stopped
+    depends_on:
+      - omb
+    ports:
+      - "${OMB_HTTP_PORT:-8080}:80"
+    environment:
+      # TLS ends at the estate edge (NPM), which forwards to this port. Caddy is
+      # here for the socket hop and for the trusted-proxy headers, not for a
+      # certificate: OMB_HTTPS_HOST is what it should call "https" for.
+      OMB_HTTPS_HOST: ${DOMAIN:-bot.innotel.site}
+      OMB_TRUSTED_PROXY_CIDRS: ${OMB_TRUSTED_PROXY_CIDRS:-172.16.0.0/12 10.0.0.0/8 192.168.0.0/16}
+    volumes:
+      - omb-edge:/run/openmausbot
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+
+volumes:
+  omb-data:
+  omb-edge:

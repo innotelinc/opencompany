@@ -4,6 +4,8 @@ import { getConfig, liveModelConfigured } from "@/lib/config";
 import { tryGetSession } from "@/lib/session";
 import { workerStatus } from "@/lib/domain/ops";
 import { getProviderHealth } from "@/lib/domain/provider";
+import { approvalLinksEnabled } from "@/lib/domain/approvals";
+import { smtpConfigured } from "@/lib/mail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +30,9 @@ export async function GET() {
       backend: getConfig().agentBackend,
       liveModel: liveModelConfigured(),
       worker: workerStatus(),
+      // Whether the owner can be reached away from the console: the popup needs
+      // nothing, the email needs a relay and a signing secret.
+      approvals: { links: approvalLinksEnabled(), email: smtpConfigured() },
       provider: session ? getProviderHealth(session.company.id) : null,
     });
   } catch (error) {

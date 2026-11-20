@@ -12,7 +12,18 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 const SESSION_COOKIE = "oc_session";
 
-const PUBLIC_PATHS = ["/signin", "/site", "/api/public-site/health", "/api/health", "/api/auth/"];
+const PUBLIC_PATHS = [
+  "/signin",
+  "/site",
+  // An emailed approval link has to work without a session: the owner may be
+  // reading the message on a phone. The token is the credential, and the page
+  // it opens still requires an explicit press to approve.
+  "/approvals",
+  "/api/approvals/consume",
+  "/api/public-site/health",
+  "/api/health",
+  "/api/auth/",
+];
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function isPublic(pathname: string): boolean {

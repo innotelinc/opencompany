@@ -2,6 +2,7 @@ import { closeDb, getDb, nowIso } from "@/lib/db";
 import { getConfig } from "@/lib/config";
 import { listCompanies } from "@/lib/domain/repo";
 import { workerTick } from "@/lib/engine/orchestrator";
+import { escalatePendingApprovals } from "@/lib/domain/approvals";
 
 /**
  * Durable background worker. Runs outside the browser and outside Next.js:
@@ -35,7 +36,11 @@ async function tickOnce(): Promise<boolean> {
     try {
       const result = await workerTick(company.id, workerId);
       const interesting =
-        result.dispatched.length || result.recovered || result.external.length || result.reports.length || result.blocked.length;
+        result.dispatched.length ||
+        result.recovered ||
+        result.external.length ||
+        result.reports.length ||
+        result.blocked.length;
       if (interesting) {
         log(
           JSON.stringify({
@@ -49,6 +54,11 @@ async function tickOnce(): Promise<boolean> {
           }),
         );
       }
+      // The worker is the durable channel: it runs whether or not a tab is open,
+      // so it is where a decision the owner has not seen becomes an email.
+      const escalation = await escalatePendingApprovals(company.id);
+      if (escalation.sent > 0) log(`emailed ${escalation.sent} approval request(s) for ${company.slug}`);
+
       didWork = didWork || Boolean(result.dispatched.length);
     } catch (error) {
       log(`tick failed for ${company.slug}: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
