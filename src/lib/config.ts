@@ -48,6 +48,42 @@ export function getConfig() {
         appName: process.env.COOLIFY_APP_NAME?.trim() || "opencompany",
       },
     },
+    // Optional self-hosted integrations. Every one of these is off until its
+    // address is set; the app keeps working without any of them.
+    integrations: {
+      // OpenMausBot harness that can execute employee work. Same filesystem as
+      // this app is required if its bots are to write deliverables here.
+      openmaus: {
+        baseUrl: (process.env.OPENMAUSBOT_URL ?? "").replace(/\/+$/, ""),
+        token: process.env.OPENMAUSBOT_TOKEN?.trim() ?? "",
+        timeoutMs: num(process.env.OPENCOMPANY_OPENMAUS_TIMEOUT_MS, 120_000),
+        botPrefix: process.env.OPENCOMPANY_OPENMAUS_BOT_PREFIX?.trim() || "openco",
+      },
+      // Voice: open-source TTS/STT over OpenAI-compatible HTTP. Speaches serves
+      // Kokoro/Piper voices and faster-whisper; Chatterbox serves cloned voices.
+      voice: {
+        provider: (process.env.OPENCOMPANY_TTS_PROVIDER ?? "speaches").toLowerCase(),
+        baseUrl: (process.env.OPENCOMPANY_TTS_URL ?? "").replace(/\/+$/, ""),
+        model: process.env.OPENCOMPANY_TTS_MODEL?.trim() ?? "",
+        voice: process.env.OPENCOMPANY_TTS_VOICE?.trim() ?? "af_heart",
+        sttProvider: (process.env.OPENCOMPANY_STT_PROVIDER ?? "speaches").toLowerCase(),
+        sttBaseUrl: (process.env.OPENCOMPANY_STT_URL ?? process.env.OPENCOMPANY_TTS_URL ?? "").replace(/\/+$/, ""),
+        sttModel: process.env.OPENCOMPANY_STT_MODEL?.trim() ?? "Systran/faster-whisper-base",
+        timeoutMs: num(process.env.OPENCOMPANY_VOICE_TIMEOUT_MS, 60_000),
+      },
+      // Desktop computers: one isolated container per bot, replacing a hosted
+      // computer service. The Docker Engine API is called directly.
+      desktop: {
+        provider: (process.env.OPENCOMPANY_DESKTOP_PROVIDER ?? "none").toLowerCase(),
+        dockerHost: process.env.OPENCOMPANY_DESKTOP_DOCKER_HOST?.trim() ?? "",
+        image: process.env.OPENCOMPANY_DESKTOP_IMAGE?.trim() || "lscr.io/linuxserver/webtop:ubuntu-kde",
+        prefix: process.env.OPENCOMPANY_DESKTOP_PREFIX?.trim() || "openco-desk",
+        publicHost: process.env.OPENCOMPANY_DESKTOP_PUBLIC_HOST?.trim() ?? "",
+        port: num(process.env.OPENCOMPANY_DESKTOP_PORT, 3000),
+        memoryMb: num(process.env.OPENCOMPANY_DESKTOP_MEMORY_MB, 2048),
+        cpus: num(process.env.OPENCOMPANY_DESKTOP_CPUS, 1),
+      },
+    },
     // Reaching the owner when a decision is waiting. The popup is the live
     // channel; these settings decide when an email takes over, where its link
     // points, and the secret that makes the link unforgeable.
@@ -79,6 +115,7 @@ export type AppConfig = ReturnType<typeof getConfig>;
 /** True when the configured backend can actually call a model. */
 export function liveModelConfigured(): boolean {
   const config = getConfig();
+  if (config.agentBackend === "openmaus") return config.integrations.openmaus.baseUrl.length > 0;
   return config.agentBackend === "llm" && config.openai.apiKey.length > 0;
 }
 

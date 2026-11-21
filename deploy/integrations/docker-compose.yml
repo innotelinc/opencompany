@@ -1,0 +1,28 @@
+# Open-source replacements for the hosted voice services.
+#
+#   docker compose -f deploy/integrations/docker-compose.yml up -d
+#
+# Speaches (MIT) serves both Kokoro/Piper speech and faster-whisper
+# recognition over OpenAI-compatible routes. Chatterbox adds cloned voices.
+# Neither needs an account or an API key.
+services:
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    container_name: openco-speaches
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      HF_HUB_CACHE: /home/ubuntu/.cache/huggingface/hub
+    volumes:
+      - speaches-cache:/home/ubuntu/.cache/huggingface/hub
+
+  chatterbox:
+    image: travisvn/chatterbox-tts-api:latest
+    container_name: openco-chatterbox
+    restart: unless-stopped
+    ports:
+      - "4123:4123"
+
+volumes:
+  speaches-cache:

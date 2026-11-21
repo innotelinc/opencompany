@@ -61,6 +61,7 @@ import { checkPublicSite } from "@/lib/public-site/uptime";
 import { ALL_CHECKS, checksPassed, runChecks } from "@/lib/engine/checks";
 import { DeterministicBackend } from "@/lib/engine/adapters/deterministic";
 import { LlmBackend, ProviderUnavailableError, RunStoppedError } from "@/lib/engine/adapters/llm";
+import { OpenMausBackend } from "@/lib/integrations/openmaus";
 import { approvedExternalActions, executeExternalAction, recoverStaleExternalActions } from "@/lib/engine/external";
 import { deploymentTargetLabel } from "@/lib/engine/deploy-target";
 import { planDeployDecision } from "@/lib/engine/deploy-decision";
@@ -686,14 +687,21 @@ export async function executeClaimedRun(input: {
     };
 
     // An employee pinned to `llm` is live, and setting the company backend to
-    // `llm` promotes every employee to live work. `deterministic` employees stay
-    // offline only while the company is in deterministic mode.
+    // `llm` promotes every employee to live work. `openmaus` runs the same work
+    // on an OpenMausBot harness. `deterministic` employees stay offline only
+    // while the company is in deterministic mode.
     const liveBackend = employee.backend === "llm" || config.agentBackend === "llm";
-    const backend = liveBackend
-      ? config.openai.apiKey
-        ? new LlmBackend()
-        : null
-      : new DeterministicBackend();
+    const useOpenMaus =
+      employee.backend !== "llm" &&
+      config.agentBackend === "openmaus" &&
+      Boolean(config.integrations.openmaus.baseUrl);
+    const backend = useOpenMaus
+      ? new OpenMausBackend()
+      : liveBackend
+        ? config.openai.apiKey
+          ? new LlmBackend()
+          : null
+        : new DeterministicBackend();
 
     if (!backend) {
       throw new ProviderUnavailableError(

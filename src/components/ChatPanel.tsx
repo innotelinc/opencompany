@@ -84,6 +84,74 @@ function OwnerActions({ snapshot }: { snapshot: Record<string, unknown> }) {
     },
   });
 
+  useCopilotAction({
+    name: "ask_openmaus_bot",
+    description:
+      "Send work to a bot on the connected OpenMausBot harness. The bot runs in its own thread; this returns the receipt, not the finished work.",
+    parameters: [
+      { name: "botId", type: "string", description: "OpenMausBot bot id from the integrations status", required: true },
+      { name: "text", type: "string", description: "The instruction for that bot", required: true },
+    ],
+    handler: async ({ botId, text }: { botId: string; text: string }) => {
+      const response = await fetch("/api/integrations/openmaus", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "send", botId, text }),
+      });
+      const payload = await response.json();
+      return response.ok
+        ? `OpenMausBot accepted the turn (${payload.receipt?.messageId ?? "queued"}).`
+        : `Rejected: ${payload.error}`;
+    },
+  });
+
+  useCopilotAction({
+    name: "read_reply_aloud",
+    description:
+      "Read a reply aloud through the owner's own open-source speech server (Speaches or Chatterbox). No hosted voice account is used.",
+    parameters: [
+      { name: "text", type: "string", description: "The text to speak", required: true },
+      { name: "voice", type: "string", description: "Optional voice id", required: false },
+    ],
+    handler: async ({ text, voice }: { text: string; voice?: string }) => {
+      const response = await fetch("/api/voice/tts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, voice }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        return `Voice unavailable: ${payload.error ?? response.status}`;
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
+      return "Speaking it through the local speech server.";
+    },
+  });
+
+  useCopilotAction({
+    name: "open_bot_desktop",
+    description:
+      "Give a bot its own isolated Linux desktop (a self-hosted container with a browser desktop and terminal) and open it.",
+    parameters: [
+      { name: "key", type: "string", description: "Employee id or a stable desktop name", required: true },
+    ],
+    handler: async ({ key }: { key: string }) => {
+      const response = await fetch("/api/computers/desktop", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "provision", key }),
+      });
+      const payload = await response.json();
+      if (!response.ok) return `Desktop unavailable: ${payload.error}`;
+      const url = payload.desktop?.url as string | undefined;
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      return url ? `Desktop ready at ${url}.` : "Desktop started, but no public address is configured.";
+    },
+  });
+
   return null;
 }
 
